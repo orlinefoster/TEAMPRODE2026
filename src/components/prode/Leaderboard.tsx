@@ -5,19 +5,26 @@ import { computeLeaderboard } from '../../services/scoringEngine';
 interface LeaderboardProps {
   users: UserProfile[];
   onSelectUser: (user: UserProfile) => void;
+  isAdmin: boolean;
 }
 
 export const Leaderboard: React.FC<LeaderboardProps> = ({
   users,
-  onSelectUser
+  onSelectUser,
+  isAdmin
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Calcular ranking oficial ordenado
   const rankedUsers = computeLeaderboard(users);
 
+  // Filtrar para ocultar participantes fantasmas a usuarios que no son admin
+  const visibleRankedUsers = isAdmin 
+    ? rankedUsers 
+    : rankedUsers.filter(u => !u.isGhost);
+
   // Filtrar por término de búsqueda
-  const filteredRankings = rankedUsers.filter((u) =>
+  const filteredRankings = visibleRankedUsers.filter((u) =>
     u.displayName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -84,7 +91,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                       style={{
                         borderBottom: '1px solid var(--border-light)',
                         cursor: 'pointer',
-                        transition: 'background-color 0.2s'
+                        transition: 'background-color 0.2s',
+                        opacity: u.isGhost ? 0.75 : 1 // Menor opacidad para indicar fantasma
                       }}
                       className="leaderboard-row"
                     >
@@ -106,9 +114,16 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                               border: u.position && u.position <= 3 ? '2px solid var(--accent-gold)' : '1px solid var(--border-light)'
                             }}
                           />
-                          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: u.position && u.position === 1 ? 'var(--accent-gold)' : 'var(--text-main)' }}>
-                            {u.displayName}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.95rem', color: u.position && u.position === 1 ? 'var(--accent-gold)' : 'var(--text-main)' }}>
+                              {u.displayName}
+                            </span>
+                            {u.isGhost && (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--accent-gold)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                👻 Fantasma (Test)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
 

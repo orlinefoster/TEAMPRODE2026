@@ -12,6 +12,7 @@ import { ProdeForm } from '../components/prode/ProdeForm';
 import { ScenarioSimulator } from '../components/prode/ScenarioSimulator';
 import { ParticipantsTable } from '../components/prode/ParticipantsTable';
 import { Leaderboard } from '../components/prode/Leaderboard';
+import { GhostCreator } from '../components/admin/GhostCreator';
 import type { WhitelistEntry, Match, Prediction, UserProfile } from '../types';
 import { 
   collection, 
@@ -32,12 +33,15 @@ import {
   addNewMatchToDB,
   getUserPredictions,
   saveUserPrediction,
-  getAllParticipantsFromDB
+  getAllParticipantsFromDB,
+  createGhostParticipant,
+  randomizeGhostPredictions
 } from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
 type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile';
 type ProdeSubTab = 'fill' | 'calendar' | 'scenario' | 'participants';
+type AdminSubTab = 'whitelist' | 'scheduler' | 'ghosts';
 
 // Mock inicial de correos permitidos para desarrollo local
 const INITIAL_MOCK_WHITELIST: WhitelistEntry[] = [
@@ -56,7 +60,7 @@ export const AppContainer: React.FC = () => {
   const [prodeSubTab, setProdeSubTab] = useState<ProdeSubTab>('fill');
 
   // Sub-navegación exclusiva para panel de administración
-  const [adminSubTab, setAdminSubTab] = useState<'whitelist' | 'scheduler'>('whitelist');
+  const [adminSubTab, setAdminSubTab] = useState<AdminSubTab>('whitelist');
 
   // Estados específicos para la Whitelist
   const [whitelistEntries, setWhitelistEntries] = useState<WhitelistEntry[]>([]);
@@ -75,6 +79,12 @@ export const AppContainer: React.FC = () => {
   const [adminSchedulingLoading, setAdminSchedulingLoading] = useState(false);
   const [adminSchedulingError, setAdminSchedulingError] = useState<string | null>(null);
   const [adminSchedulingSuccess, setAdminSchedulingSuccess] = useState<string | null>(null);
+
+  // Estados para crear participantes fantasmas
+  const [adminGhostLoading, setAdminGhostLoading] = useState(false);
+  const [adminGhostError, setAdminGhostError] = useState<string | null>(null);
+  const [adminGhostSuccess, setAdminGhostSuccess] = useState<string | null>(null);
+  const [loadingGhostRandomization, setLoadingGhostRandomization] = useState(false);
 
   // Estados específicos para las Predicciones (Prode)
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -193,6 +203,8 @@ export const AppContainer: React.FC = () => {
     setMatchesError(null);
     setAdminSchedulingError(null);
     setAdminSchedulingSuccess(null);
+    setAdminGhostError(null);
+    setAdminGhostSuccess(null);
     setSelectedParticipantDetail(null);
     setSelectedParticipantPreds([]);
     setMemberView(view);
@@ -303,6 +315,47 @@ export const AppContainer: React.FC = () => {
       setAdminSchedulingError('No se pudo agendar el partido. Comprobá las reglas de Firestore.');
     } finally {
       setAdminSchedulingLoading(false);
+    }
+  };
+
+  // Acción Admin: Crear un participante fantasma de prueba
+  const handleCreateGhost = async (name: string) => {
+    setAdminGhostLoading(true);
+    setAdminGhostError(null);
+    setAdminGhostSuccess(null);
+    try {
+      const newGhost = await createGhostParticipant(name);
+      setAdminGhostSuccess(`¡Participante fantasma "${newGhost.displayName}" creado con éxito!`);
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error('Error al crear fantasma:', err);
+      setAdminGhostError('No se pudo registrar el participante fantasma.');
+    } finally {
+      setAdminGhostLoading(false);
+    }
+  };
+
+  // Acción Admin: Aleatorizar predicciones de un fantasma
+  const handleRandomizeGhostPredictions = async (ghostUid: string) => {
+    setLoadingGhostRandomization(true);
+    try {
+      await randomizeGhostPredictions(ghostUid);
+      await loadPredictionsAndParticipants();
+      
+      // Recargar el detalle en pantalla para que el admin vea los goles cargados al instante
+      const updatedPreds = await getUserPredictions(ghostUid);
+      setSelectedParticipantPreds(updatedPreds);
+      
+      const parts = await getAllParticipantsFromDB();
+      const updatedGhost = parts.find(u => u.uid === ghostUid);
+      if (updatedGhost) {
+        setSelectedParticipantDetail(updatedGhost);
+      }
+    } catch (err) {
+      console.error('Error al aleatorizar predicciones:', err);
+      alert('Error al generar goles del fantasma.');
+    } finally {
+      setLoadingGhostRandomization(false);
     }
   };
 
@@ -525,6 +578,9 @@ export const AppContainer: React.FC = () => {
                       setSelectedParticipantDetail(null);
                       setSelectedParticipantPreds([]);
                     }}
+                    isAdmin={isAdmin}
+                    onRandomizeGhost={handleRandomizeGhostPredictions}
+                    loadingGhost={loadingGhostRandomization}
                   />
                 )}
               </>
@@ -537,6 +593,7 @@ export const AppContainer: React.FC = () => {
             <Leaderboard 
               users={participants}
               onSelectUser={handleSelectParticipant}
+              isAdmin={isAdmin}
             />
 
             {/* Panel flotante de detalle si seleccionan un usuario */}
@@ -552,6 +609,9 @@ export const AppContainer: React.FC = () => {
                     setSelectedParticipantDetail(null);
                     setSelectedParticipantPreds([]);
                   }}
+                  isAdmin={isAdmin}
+                  onRandomizeGhost={handleRandomizeGhostPredictions}
+                  loadingGhost={loadingGhostRandomization}
                 />
               </div>
             )}
@@ -579,6 +639,22 @@ export const AppContainer: React.FC = () => {
                 Gestionar Whitelist
               </button>
               <button
+                onClick={() => setAdminSubTab('ghosts')}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.9rem',
+                  borderRadius: '6px',
+                  backgroundColor: adminSubTab === 'ghosts' ? 'var(--border-light)' : 'transparent',
+                  color: adminSubTab === 'ghosts' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  border: '1px solid',
+                  borderColor: adminSubTab === 'ghosts' ? 'var(--border-active)' : 'transparent',
+                  fontWeight: 600
+                }}
+              >
+                Participantes Fantasmas
+              </button>
+              <button
                 onClick={() => setAdminSubTab('scheduler')}
                 className="btn"
                 style={{
@@ -597,7 +673,7 @@ export const AppContainer: React.FC = () => {
             </div>
 
             {/* Renderizado Condicional de Sub-vistas Admin */}
-            {adminSubTab === 'whitelist' ? (
+            {adminSubTab === 'whitelist' && (
               <WhitelistManager 
                 entries={whitelistEntries}
                 onAddEmail={handleAddEmail}
@@ -606,7 +682,16 @@ export const AppContainer: React.FC = () => {
                 error={whitelistError}
                 successMessage={whitelistSuccess}
               />
-            ) : (
+            )}
+            {adminSubTab === 'ghosts' && (
+              <GhostCreator 
+                onCreateGhost={handleCreateGhost}
+                loading={adminGhostLoading}
+                error={adminGhostError}
+                successMessage={adminGhostSuccess}
+              />
+            )}
+            {adminSubTab === 'scheduler' && (
               <MatchScheduler 
                 onScheduleMatch={handleScheduleMatch}
                 loading={adminSchedulingLoading}

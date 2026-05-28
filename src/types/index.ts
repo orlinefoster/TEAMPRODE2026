@@ -10,6 +10,7 @@ export interface UserProfile {
   points: number;
   exactMatchesCount: number; // Aciertos marcadores exactos (3 pts)
   outcomeMatchesCount: number; // Aciertos resultado/ganador (1 pt)
+  isGhost?: boolean; // Participante de prueba creado por admin
 }
 
 export interface WhitelistEntry {
@@ -50,7 +51,9 @@ export interface LeaderboardUser {
   position?: number;
   exactMatchesCount: number;
   outcomeMatchesCount: number;
+  isGhost?: boolean;
 }
+
 
 export interface ScenarioMatch extends Match {
   scenarioHomeScore?: number;

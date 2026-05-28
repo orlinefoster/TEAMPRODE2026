@@ -7,7 +7,8 @@ import {
   where,
   setDoc,
   getDoc,
-  updateDoc
+  updateDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from './firebase';
 import type { Match, Prediction, UserProfile } from '../types';
@@ -407,3 +408,163 @@ export const getAllParticipantsFromDB = async (): Promise<UserProfile[]> => {
   });
   return users;
 };
+
+/**
+ * Crea un participante fantasma de prueba (exclusivo para testing administrativo).
+ * Soporta entorno Mock con LocalStorage.
+ */
+export const createGhostParticipant = async (displayName: string): Promise<UserProfile> => {
+  const ghostId = `ghost_${Date.now()}`;
+  const ghostEmail = `ghost_${Date.now()}@teamprode.com`;
+  const ghostProfile: UserProfile = {
+    uid: ghostId,
+    email: ghostEmail,
+    displayName: `👻 ${displayName}`,
+    photoURL: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(displayName)}`,
+    role: 'user',
+    completedProde: false,
+    points: 0,
+    exactMatchesCount: 0,
+    outcomeMatchesCount: 0,
+    isGhost: true
+  };
+
+  if (IS_MOCK_ENV) {
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+    users.push(ghostProfile);
+    localStorage.setItem('prode_users', JSON.stringify(users));
+    console.log('👻 Seed: Participante fantasma creado en LocalStorage (Mock).');
+    return ghostProfile;
+  }
+
+  try {
+    const userDocRef = doc(db, 'users', ghostId);
+    await setDoc(userDocRef, {
+      ...ghostProfile,
+      createdAt: serverTimestamp()
+    });
+    console.log('👻 DB: Participante fantasma registrado con éxito en Firestore.');
+    return ghostProfile;
+  } catch (err) {
+    console.error('Error al registrar participante fantasma:', err);
+    throw err;
+  }
+};
+
+/**
+ * Aleatoriza las predicciones de un participante fantasma y recalcula sus puntos en cascada.
+ * Soporta entorno Mock con LocalStorage.
+ */
+export const randomizeGhostPredictions = async (ghostId: string): Promise<void> => {
+  const matches = await getMatchesFromDB();
+  const batch = !IS_MOCK_ENV ? writeBatch(db) : null;
+  const mockPredictions: Prediction[] = [];
+
+  for (const match of matches) {
+    const predictionId = `${ghostId}_${match.matchId}`;
+    const homePrediction = Math.floor(Math.random() * 5); // 0 a 4 goles
+    const awayPrediction = Math.floor(Math.random() * 5);
+    
+    let pointsEarned = 0;
+    let calculated = false;
+
+    if (match.status === 'played' && match.homeScore !== undefined && match.awayScore !== undefined) {
+      const res = calculatePoints(homePrediction, awayPrediction, match.homeScore, match.awayScore);
+      pointsEarned = res.points;
+      calculated = true;
+    }
+
+    const pred: Prediction = {
+      predictionId,
+      userId: ghostId,
+      matchId: match.matchId,
+      homePrediction,
+      awayPrediction,
+      pointsEarned: calculated ? pointsEarned : undefined,
+      calculated
+    };
+
+    if (IS_MOCK_ENV) {
+      mockPredictions.push(pred);
+    } else if (batch) {
+      const predDocRef = doc(db, 'predictions', predictionId);
+      batch.set(predDocRef, pred);
+    }
+  }
+
+  if (IS_MOCK_ENV) {
+    // Guardar predicciones mock
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    const predictions: Prediction[] = JSON.parse(predsJson);
+    // Filtrar predicciones viejas del mismo fantasma
+    const filtered = predictions.filter(p => p.userId !== ghostId);
+    localStorage.setItem('prode_predictions', JSON.stringify([...filtered, ...mockPredictions]));
+
+    // Recalcular puntos e hit counts
+    let totalPoints = 0;
+    let exactCount = 0;
+    let outcomeCount = 0;
+
+    mockPredictions.forEach((p) => {
+      if (p.calculated && p.pointsEarned !== undefined) {
+        totalPoints += p.pointsEarned;
+        if (p.pointsEarned === 3) exactCount++;
+        if (p.pointsEarned === 1) outcomeCount++;
+      }
+    });
+
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+    const userIndex = users.findIndex(u => u.uid === ghostId);
+    if (userIndex !== -1) {
+      users[userIndex].completedProde = true;
+      users[userIndex].points = totalPoints;
+      users[userIndex].exactMatchesCount = exactCount;
+      users[userIndex].outcomeMatchesCount = outcomeCount;
+      localStorage.setItem('prode_users', JSON.stringify(users));
+    }
+    console.log('🎲 Recalculation: Predicciones aleatorizadas y recalculadas para el fantasma mock.');
+    return;
+  }
+
+  try {
+    if (batch) {
+      // 1. Guardar todas las predicciones del fantasma en el primer lote
+      await batch.commit();
+
+      // 2. Calcular puntos del fantasma para el segundo lote
+      let totalPoints = 0;
+      let exactCount = 0;
+      let outcomeCount = 0;
+
+      const userPredsQuery = query(collection(db, 'predictions'), where('userId', '==', ghostId));
+      const userPredsSnapshot = await getDocs(userPredsQuery);
+
+      userPredsSnapshot.forEach((predDocSnap) => {
+        const pred = predDocSnap.data() as Prediction;
+        if (pred.calculated && pred.pointsEarned !== undefined) {
+          totalPoints += pred.pointsEarned;
+          if (pred.pointsEarned === 3) exactCount++;
+          if (pred.pointsEarned === 1) outcomeCount++;
+        }
+      });
+
+      const secondBatch = writeBatch(db);
+      const userDocRef = doc(db, 'users', ghostId);
+      secondBatch.update(userDocRef, {
+        completedProde: true,
+        points: totalPoints,
+        exactMatchesCount: exactCount,
+        outcomeMatchesCount: outcomeCount
+      });
+
+      await secondBatch.commit();
+      console.log('🎲 Recalculation: Predicciones aleatorizadas y recalculadas para el fantasma en Firestore.');
+    }
+  } catch (err) {
+    console.error('Error al aleatorizar predicciones del fantasma:', err);
+    throw err;
+  }
+};
+

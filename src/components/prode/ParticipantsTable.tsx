@@ -8,6 +8,9 @@ interface ParticipantsTableProps {
   selectedUserPredictions: Prediction[];
   matches: Match[];
   onClosePredictionsPanel: () => void;
+  isAdmin: boolean;
+  onRandomizeGhost?: (uid: string) => Promise<void>;
+  loadingGhost?: boolean;
 }
 
 export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({
@@ -16,8 +19,16 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({
   selectedUser,
   selectedUserPredictions,
   matches,
-  onClosePredictionsPanel
+  onClosePredictionsPanel,
+  isAdmin,
+  onRandomizeGhost,
+  loadingGhost = false
 }) => {
+  // Filtrar participantes fantasmas para no-admins
+  const visibleUsers = isAdmin 
+    ? users 
+    : users.filter(u => !u.isGhost);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: selectedUser ? '1fr 1fr' : '1fr', gap: '25px', alignItems: 'start', transition: 'grid-template-columns 0.3s' }}>
@@ -39,13 +50,14 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
+                {visibleUsers.map((u) => (
                   <tr 
                     key={u.uid} 
                     style={{ 
                       borderBottom: '1px solid var(--border-light)', 
                       backgroundColor: selectedUser?.uid === u.uid ? 'var(--bg-overlay)' : 'transparent',
-                      transition: 'background-color 0.2s' 
+                      transition: 'background-color 0.2s',
+                      opacity: u.isGhost ? 0.75 : 1
                     }}
                   >
                     <td style={{ padding: '14px 8px' }}>
@@ -120,6 +132,38 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({
                 ×
               </button>
             </div>
+
+            {/* Panel de Llenado Rápido Administrativo para Fantasma */}
+            {selectedUser.isGhost && isAdmin && onRandomizeGhost && (
+              <div style={{ 
+                backgroundColor: 'var(--bg-overlay)', 
+                border: '1px solid var(--border-light)', 
+                padding: '16px', 
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '1.5rem' }}>👻</span>
+                  <div>
+                    <h5 style={{ fontWeight: 600 }}>Pruebas de Participante Fantasma</h5>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      Como administrador podés poblar este perfil con pronósticos aleatorios.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onRandomizeGhost(selectedUser.uid)}
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.85rem', width: '100%', height: '38px' }}
+                  disabled={loadingGhost}
+                >
+                  {loadingGhost ? 'Generando pronósticos...' : '🎲 Aleatorizar Todos los Goles'}
+                </button>
+              </div>
+            )}
 
             {selectedUserPredictions.length === 0 ? (
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '30px 0' }}>
