@@ -8,7 +8,10 @@ import { WhitelistManager } from '../components/admin/WhitelistManager';
 import { MatchList } from '../components/prode/MatchList';
 import { MatchScoreModal } from '../components/admin/MatchScoreModal';
 import { MatchScheduler } from '../components/admin/MatchScheduler';
-import type { WhitelistEntry, Match } from '../types';
+import { ProdeForm } from '../components/prode/ProdeForm';
+import { ScenarioSimulator } from '../components/prode/ScenarioSimulator';
+import { ParticipantsTable } from '../components/prode/ParticipantsTable';
+import type { WhitelistEntry, Match, Prediction, UserProfile } from '../types';
 import { 
   collection, 
   onSnapshot, 
@@ -17,13 +20,23 @@ import {
   deleteDoc, 
   query, 
   orderBy, 
-  serverTimestamp 
+  serverTimestamp,
+  getDocs
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from '../services/firebase';
-import { seedWorldCupMatches, getMatchesFromDB, updateMatchResultInDB, addNewMatchToDB } from '../services/db';
+import { 
+  seedWorldCupMatches, 
+  getMatchesFromDB, 
+  updateMatchResultInDB, 
+  addNewMatchToDB,
+  getUserPredictions,
+  saveUserPrediction,
+  getAllParticipantsFromDB
+} from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
 type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile';
+type ProdeSubTab = 'fill' | 'calendar' | 'scenario' | 'participants';
 
 // Mock inicial de correos permitidos para desarrollo local
 const INITIAL_MOCK_WHITELIST: WhitelistEntry[] = [
@@ -38,6 +51,9 @@ export const AppContainer: React.FC = () => {
   const [guestView, setGuestView] = useState<GuestView>('login');
   const [memberView, setMemberView] = useState<MemberView>('prode');
   
+  // Sub-navegación dentro de "Mi Prode"
+  const [prodeSubTab, setProdeSubTab] = useState<ProdeSubTab>('fill');
+
   // Sub-navegación exclusiva para panel de administración
   const [adminSubTab, setAdminSubTab] = useState<'whitelist' | 'scheduler'>('whitelist');
 
@@ -59,6 +75,17 @@ export const AppContainer: React.FC = () => {
   const [adminSchedulingError, setAdminSchedulingError] = useState<string | null>(null);
   const [adminSchedulingSuccess, setAdminSchedulingSuccess] = useState<string | null>(null);
 
+  // Estados específicos para las Predicciones (Prode)
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [allPredictions, setAllPredictions] = useState<Prediction[]>([]);
+  const [savingPredictionMatchId, setSavingPredictionMatchId] = useState<string | null>(null);
+  const [savedPredictionMatchId, setSavedPredictionMatchId] = useState<string | null>(null);
+
+  // Estados específicos para los Participantes
+  const [participants, setParticipants] = useState<UserProfile[]>([]);
+  const [selectedParticipantDetail, setSelectedParticipantDetail] = useState<UserProfile | null>(null);
+  const [selectedParticipantPreds, setSelectedParticipantPreds] = useState<Prediction[]>([]);
+
   // 1. Auto-sembrar e inicializar partidos al cargar
   useEffect(() => {
     if (!user) return;
@@ -77,8 +104,48 @@ export const AppContainer: React.FC = () => {
       }
     };
 
+    // Monitorear errores de carga en logs
+    if (matchesError) {
+      console.warn('Error detectado al inicializar partidos:', matchesError);
+    }
+
     initializeMatches();
-  }, [user]);
+  }, [user, matchesError]);
+
+  // 2. Cargar predicciones del usuario activo y participantes
+  const loadPredictionsAndParticipants = async () => {
+    if (!user) return;
+    try {
+      // Cargar predicciones del usuario logueado
+      const userPreds = await getUserPredictions(user.uid);
+      setPredictions(userPreds);
+
+      // Cargar listado de participantes
+      const parts = await getAllParticipantsFromDB();
+      setParticipants(parts);
+
+      // Cargar TODAS las predicciones del torneo (necesario para el Modo Escenario)
+      if (IS_MOCK_ENV) {
+        const allPredsJson = localStorage.getItem('prode_predictions') || '[]';
+        setAllPredictions(JSON.parse(allPredsJson));
+      } else {
+        const allPredsSnap = await getDocs(collection(db, 'predictions'));
+        const allPreds: Prediction[] = [];
+        allPredsSnap.forEach((docSnap: any) => {
+          allPreds.push(docSnap.data() as Prediction);
+        });
+        setAllPredictions(allPreds);
+      }
+    } catch (err) {
+      console.error('Error cargando predicciones:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadPredictionsAndParticipants();
+    }
+  }, [user, memberView, prodeSubTab]);
 
   // Escuchar a la Whitelist en tiempo real (si es Admin y no es Mock)
   useEffect(() => {
@@ -125,6 +192,8 @@ export const AppContainer: React.FC = () => {
     setMatchesError(null);
     setAdminSchedulingError(null);
     setAdminSchedulingSuccess(null);
+    setSelectedParticipantDetail(null);
+    setSelectedParticipantPreds([]);
     setMemberView(view);
   };
 
@@ -199,9 +268,10 @@ export const AppContainer: React.FC = () => {
     try {
       await updateMatchResultInDB(matchId, homeScore, awayScore);
       
-      // Recargar partidos de la DB para actualizar UI
+      // Recargar partidos y recálculos de la DB
       const updatedMatches = await getMatchesFromDB();
       setMatches(updatedMatches);
+      await loadPredictionsAndParticipants();
     } catch (err) {
       console.error('Error guardando resultado de partido:', err);
       throw err;
@@ -232,6 +302,41 @@ export const AppContainer: React.FC = () => {
       setAdminSchedulingError('No se pudo agendar el partido. Comprobá las reglas de Firestore.');
     } finally {
       setAdminSchedulingLoading(false);
+    }
+  };
+
+  // Acción Usuario: Guardado automático de predicciones
+  const handleSavePrediction = async (matchId: string, homePrediction: number, awayPrediction: number) => {
+    if (!user) return;
+    setSavingPredictionMatchId(matchId);
+    setSavedPredictionMatchId(null);
+    try {
+      await saveUserPrediction(user.uid, matchId, homePrediction, awayPrediction);
+      
+      // Actualizar estado local inmediato
+      setSavedPredictionMatchId(matchId);
+      await loadPredictionsAndParticipants();
+      
+      // Borrar mensaje de guardado tras 2.5s
+      setTimeout(() => {
+        setSavedPredictionMatchId((curr) => curr === matchId ? null : curr);
+      }, 2500);
+    } catch (err) {
+      console.error('Error guardando predicción:', err);
+      alert('Hubo un error al guardar tu predicción. Reintentá.');
+    } finally {
+      setSavingPredictionMatchId(null);
+    }
+  };
+
+  // Acción Social: Cargar detalle de predicciones de otro usuario
+  const handleSelectParticipant = async (selectedUser: UserProfile) => {
+    setSelectedParticipantDetail(selectedUser);
+    try {
+      const preds = await getUserPredictions(selectedUser.uid);
+      setSelectedParticipantPreds(preds);
+    } catch (err) {
+      console.error('Error al cargar predicciones de participante:', err);
     }
   };
 
@@ -304,22 +409,79 @@ export const AppContainer: React.FC = () => {
       <main className="container" style={{ flex: 1, padding: '40px 20px' }}>
         {memberView === 'prode' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-            {/* Header del Calendario */}
-            <div>
-              <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', marginBottom: '8px' }}>
-                Calendario Oficial del Mundial 2026
-              </h2>
-              <p style={{ color: 'var(--text-muted)' }}>
-                Fase de Grupos • Seguimiento de marcadores reales y administración del torneo.
-              </p>
+            {/* Header y Sub-Navegación del Game Hub */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', marginBottom: '4px' }}>
+                  Game Hub Mundialista 2026
+                </h2>
+                <p style={{ color: 'var(--text-muted)' }}>
+                  Completá tus pronósticos, revisá partidos, analizá participantes y jugá con el Modo Escenario.
+                </p>
+              </div>
+
+              {/* Selector de Sub-pestañas */}
+              <div className="glass-panel" style={{ padding: '6px', display: 'flex', gap: '5px' }}>
+                <button
+                  onClick={() => setProdeSubTab('fill')}
+                  className="btn"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.85rem',
+                    borderRadius: '6px',
+                    backgroundColor: prodeSubTab === 'fill' ? 'var(--border-light)' : 'transparent',
+                    color: prodeSubTab === 'fill' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    fontWeight: 600
+                  }}
+                >
+                  📝 Llenar Prode
+                </button>
+                <button
+                  onClick={() => setProdeSubTab('calendar')}
+                  className="btn"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.85rem',
+                    borderRadius: '6px',
+                    backgroundColor: prodeSubTab === 'calendar' ? 'var(--border-light)' : 'transparent',
+                    color: prodeSubTab === 'calendar' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    fontWeight: 600
+                  }}
+                >
+                  📅 Calendario
+                </button>
+                <button
+                  onClick={() => setProdeSubTab('scenario')}
+                  className="btn"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.85rem',
+                    borderRadius: '6px',
+                    backgroundColor: prodeSubTab === 'scenario' ? 'var(--border-light)' : 'transparent',
+                    color: prodeSubTab === 'scenario' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    fontWeight: 600
+                  }}
+                >
+                  🔮 Modo Escenario
+                </button>
+                <button
+                  onClick={() => setProdeSubTab('participants')}
+                  className="btn"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.85rem',
+                    borderRadius: '6px',
+                    backgroundColor: prodeSubTab === 'participants' ? 'var(--border-light)' : 'transparent',
+                    color: prodeSubTab === 'participants' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    fontWeight: 600
+                  }}
+                >
+                  👥 Participantes
+                </button>
+              </div>
             </div>
 
-            {matchesError && (
-              <div style={{ backgroundColor: 'RGBA(239, 68, 68, 0.1)', border: '1px solid var(--accent-error)', color: 'var(--text-main)', padding: '12px 16px', borderRadius: '8px' }}>
-                ⚠️ {matchesError}
-              </div>
-            )}
-
+            {/* Renderizado de Sub-pestañas */}
             {matchesLoading ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {[1, 2, 3].map(i => (
@@ -327,11 +489,44 @@ export const AppContainer: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <MatchList 
-                matches={matches} 
-                isAdmin={isAdmin}
-                onEditMatch={(match) => setSelectedMatchToEdit(match)}
-              />
+              <>
+                {prodeSubTab === 'fill' && (
+                  <ProdeForm 
+                    matches={matches}
+                    predictions={predictions}
+                    onSavePrediction={handleSavePrediction}
+                    savingMatchId={savingPredictionMatchId}
+                    savedMatchId={savedPredictionMatchId}
+                  />
+                )}
+                {prodeSubTab === 'calendar' && (
+                  <MatchList 
+                    matches={matches} 
+                    isAdmin={isAdmin}
+                    onEditMatch={(match) => setSelectedMatchToEdit(match)}
+                  />
+                )}
+                {prodeSubTab === 'scenario' && (
+                  <ScenarioSimulator 
+                    matches={matches}
+                    allPredictions={allPredictions}
+                    users={participants}
+                  />
+                )}
+                {prodeSubTab === 'participants' && (
+                  <ParticipantsTable 
+                    users={participants}
+                    onSelectUser={handleSelectParticipant}
+                    selectedUser={selectedParticipantDetail}
+                    selectedUserPredictions={selectedParticipantPreds}
+                    matches={matches}
+                    onClosePredictionsPanel={() => {
+                      setSelectedParticipantDetail(null);
+                      setSelectedParticipantPreds([]);
+                    }}
+                  />
+                )}
+              </>
             )}
           </div>
         )}

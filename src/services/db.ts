@@ -5,7 +5,9 @@ import {
   writeBatch, 
   query, 
   where,
-  setDoc
+  setDoc,
+  getDoc,
+  updateDoc
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from './firebase';
 import type { Match, Prediction, UserProfile } from '../types';
@@ -274,4 +276,134 @@ export const addNewMatchToDB = async (matchData: {
     console.error('Error al agendar partido en Firestore:', err);
     throw err;
   }
+};
+
+/**
+ * Recupera todas las predicciones de un usuario específico.
+ * Soporta entorno Mock con LocalStorage.
+ */
+export const getUserPredictions = async (userId: string): Promise<Prediction[]> => {
+  if (IS_MOCK_ENV) {
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    const predictions: Prediction[] = JSON.parse(predsJson);
+    return predictions.filter((p) => p.userId === userId);
+  }
+
+  const q = query(collection(db, 'predictions'), where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  const predictions: Prediction[] = [];
+  snapshot.forEach((docSnap) => {
+    predictions.push(docSnap.data() as Prediction);
+  });
+  return predictions;
+};
+
+/**
+ * Guarda o actualiza una predicción individual.
+ * Si el usuario completa el 100% de los partidos del calendario, actualiza completedProde a true.
+ * Soporta entorno Mock con LocalStorage.
+ */
+export const saveUserPrediction = async (
+  userId: string,
+  matchId: string,
+  homePrediction: number,
+  awayPrediction: number
+): Promise<void> => {
+  const predictionId = `${userId}_${matchId}`;
+  
+  // 1. Validar si el partido ya empezó/jugó (bloqueado para predicciones)
+  let isMatchPlayed = false;
+  if (IS_MOCK_ENV) {
+    const matches = await getMatchesFromDB();
+    const match = matches.find(m => m.matchId === matchId);
+    isMatchPlayed = match?.status === 'played';
+  } else {
+    const matchDoc = await getDoc(doc(db, 'matches', matchId));
+    if (matchDoc.exists()) {
+      isMatchPlayed = matchDoc.data().status === 'played';
+    }
+  }
+
+  if (isMatchPlayed) {
+    throw new Error('El partido ya se ha jugado. No se pueden modificar las predicciones.');
+  }
+
+  const newPrediction: Prediction = {
+    predictionId,
+    userId,
+    matchId,
+    homePrediction,
+    awayPrediction,
+    calculated: false
+  };
+
+  if (IS_MOCK_ENV) {
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    const predictions: Prediction[] = JSON.parse(predsJson);
+    const index = predictions.findIndex(p => p.predictionId === predictionId);
+    
+    if (index !== -1) {
+      predictions[index] = newPrediction;
+    } else {
+      predictions.push(newPrediction);
+    }
+    localStorage.setItem('prode_predictions', JSON.stringify(predictions));
+
+    // Validar si completó todo el prode (comparando cantidad de predicciones del usuario vs partidos cargados)
+    const userPreds = predictions.filter(p => p.userId === userId);
+    const matches = await getMatchesFromDB();
+    
+    if (userPreds.length >= matches.length) {
+      const usersJson = localStorage.getItem('prode_users') || '[]';
+      const users: UserProfile[] = JSON.parse(usersJson);
+      const userIndex = users.findIndex(u => u.uid === userId);
+      if (userIndex !== -1) {
+        users[userIndex].completedProde = true;
+        localStorage.setItem('prode_users', JSON.stringify(users));
+      }
+    }
+    return;
+  }
+
+  try {
+    // Guardar la predicción
+    const predDocRef = doc(db, 'predictions', predictionId);
+    await setDoc(predDocRef, newPrediction);
+
+    // Comprobar si completó el prode
+    const matchesSnapshot = await getDocs(collection(db, 'matches'));
+    const totalMatchesCount = matchesSnapshot.size;
+
+    const userPredsQuery = query(collection(db, 'predictions'), where('userId', '==', userId));
+    const userPredsSnapshot = await getDocs(userPredsQuery);
+    const userPredictionsCount = userPredsSnapshot.size;
+
+    if (userPredictionsCount >= totalMatchesCount) {
+      await updateDoc(doc(db, 'users', userId), {
+        completedProde: true
+      });
+    }
+  } catch (err) {
+    console.error('Error al guardar predicción:', err);
+    throw err;
+  }
+};
+
+/**
+ * Obtiene el listado de participantes y si completaron el prode o no (tabla de control).
+ * En Mock, recupera usuarios de LocalStorage.
+ */
+export const getAllParticipantsFromDB = async (): Promise<UserProfile[]> => {
+  if (IS_MOCK_ENV) {
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const usersList: UserProfile[] = JSON.parse(usersJson);
+    return usersList;
+  }
+
+  const snapshot = await getDocs(collection(db, 'users'));
+  const users: UserProfile[] = [];
+  snapshot.forEach((docSnap) => {
+    users.push(docSnap.data() as UserProfile);
+  });
+  return users;
 };
