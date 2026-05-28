@@ -4,7 +4,8 @@ import {
   doc, 
   writeBatch, 
   query, 
-  where
+  where,
+  setDoc
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from './firebase';
 import type { Match, Prediction, UserProfile } from '../types';
@@ -232,6 +233,45 @@ export const updateMatchResultInDB = async (
     console.log('🔄 Recalculation: Puntajes y estadísticas recalculados con éxito para todos los participantes.');
   } catch (err) {
     console.error('Error actualizando resultados y recalculando puntos:', err);
+    throw err;
+  }
+};
+
+/**
+ * Agrega un nuevo partido agendado por el administrador a la base de datos.
+ * Soporta entorno Mock con LocalStorage.
+ */
+export const addNewMatchToDB = async (matchData: {
+  group: string;
+  homeTeam: string;
+  awayTeam: string;
+  date: number;
+}): Promise<void> => {
+  const matchId = `m_${matchData.date}_${Math.floor(Math.random() * 1000)}`;
+  const newMatch: Match = {
+    matchId,
+    group: matchData.group,
+    homeTeam: matchData.homeTeam,
+    awayTeam: matchData.awayTeam,
+    date: matchData.date,
+    status: 'pending'
+  };
+
+  if (IS_MOCK_ENV) {
+    const matchesJson = localStorage.getItem('prode_matches') || '[]';
+    const matches: Match[] = JSON.parse(matchesJson);
+    matches.push(newMatch);
+    localStorage.setItem('prode_matches', JSON.stringify(matches));
+    console.log('🌱 Seed: Partido agendado y guardado en LocalStorage (Mock).');
+    return;
+  }
+
+  try {
+    const matchDocRef = doc(db, 'matches', matchId);
+    await setDoc(matchDocRef, newMatch);
+    console.log('🌱 DB: Partido agendado y registrado con éxito en Firestore.');
+  } catch (err) {
+    console.error('Error al agendar partido en Firestore:', err);
     throw err;
   }
 };

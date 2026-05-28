@@ -7,6 +7,7 @@ import { Navbar } from '../components/common/Navbar';
 import { WhitelistManager } from '../components/admin/WhitelistManager';
 import { MatchList } from '../components/prode/MatchList';
 import { MatchScoreModal } from '../components/admin/MatchScoreModal';
+import { MatchScheduler } from '../components/admin/MatchScheduler';
 import type { WhitelistEntry, Match } from '../types';
 import { 
   collection, 
@@ -19,7 +20,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from '../services/firebase';
-import { seedWorldCupMatches, getMatchesFromDB, updateMatchResultInDB } from '../services/db';
+import { seedWorldCupMatches, getMatchesFromDB, updateMatchResultInDB, addNewMatchToDB } from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
 type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile';
@@ -36,6 +37,9 @@ export const AppContainer: React.FC = () => {
   // Ruteador SPA básico y ultra-resiliente
   const [guestView, setGuestView] = useState<GuestView>('login');
   const [memberView, setMemberView] = useState<MemberView>('prode');
+  
+  // Sub-navegación exclusiva para panel de administración
+  const [adminSubTab, setAdminSubTab] = useState<'whitelist' | 'scheduler'>('whitelist');
 
   // Estados específicos para la Whitelist
   const [whitelistEntries, setWhitelistEntries] = useState<WhitelistEntry[]>([]);
@@ -49,6 +53,11 @@ export const AppContainer: React.FC = () => {
   const [matchesError, setMatchesError] = useState<string | null>(null);
   const [selectedMatchToEdit, setSelectedMatchToEdit] = useState<Match | null>(null);
   const [adminSavingResult, setAdminSavingResult] = useState(false);
+
+  // Estados para agendar nuevos partidos
+  const [adminSchedulingLoading, setAdminSchedulingLoading] = useState(false);
+  const [adminSchedulingError, setAdminSchedulingError] = useState<string | null>(null);
+  const [adminSchedulingSuccess, setAdminSchedulingSuccess] = useState<string | null>(null);
 
   // 1. Auto-sembrar e inicializar partidos al cargar
   useEffect(() => {
@@ -114,6 +123,8 @@ export const AppContainer: React.FC = () => {
     setWhitelistError(null);
     setWhitelistSuccess(null);
     setMatchesError(null);
+    setAdminSchedulingError(null);
+    setAdminSchedulingSuccess(null);
     setMemberView(view);
   };
 
@@ -196,6 +207,31 @@ export const AppContainer: React.FC = () => {
       throw err;
     } finally {
       setAdminSavingResult(false);
+    }
+  };
+
+  // Acción Admin: Agendar nuevo partido en el calendario
+  const handleScheduleMatch = async (matchData: {
+    group: string;
+    homeTeam: string;
+    awayTeam: string;
+    date: number;
+  }) => {
+    setAdminSchedulingLoading(true);
+    setAdminSchedulingError(null);
+    setAdminSchedulingSuccess(null);
+    try {
+      await addNewMatchToDB(matchData);
+      setAdminSchedulingSuccess(`¡Partido ${matchData.homeTeam} vs ${matchData.awayTeam} agendado y registrado con éxito!`);
+      
+      // Recargar partidos de la DB
+      const updatedMatches = await getMatchesFromDB();
+      setMatches(updatedMatches);
+    } catch (err) {
+      console.error('Error al agendar partido:', err);
+      setAdminSchedulingError('No se pudo agendar el partido. Comprobá las reglas de Firestore.');
+    } finally {
+      setAdminSchedulingLoading(false);
     }
   };
 
@@ -315,14 +351,62 @@ export const AppContainer: React.FC = () => {
         )}
 
         {memberView === 'whitelist' && isAdmin && (
-          <WhitelistManager 
-            entries={whitelistEntries}
-            onAddEmail={handleAddEmail}
-            onRemoveEmail={handleRemoveEmail}
-            loading={whitelistLoading}
-            error={whitelistError}
-            successMessage={whitelistSuccess}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Sub-Navegación Admin */}
+            <div className="glass-panel" style={{ padding: '10px 20px', display: 'flex', gap: '15px' }}>
+              <button
+                onClick={() => setAdminSubTab('whitelist')}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.9rem',
+                  borderRadius: '6px',
+                  backgroundColor: adminSubTab === 'whitelist' ? 'var(--border-light)' : 'transparent',
+                  color: adminSubTab === 'whitelist' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  border: '1px solid',
+                  borderColor: adminSubTab === 'whitelist' ? 'var(--border-active)' : 'transparent',
+                  fontWeight: 600
+                }}
+              >
+                Gestionar Whitelist
+              </button>
+              <button
+                onClick={() => setAdminSubTab('scheduler')}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.9rem',
+                  borderRadius: '6px',
+                  backgroundColor: adminSubTab === 'scheduler' ? 'var(--border-light)' : 'transparent',
+                  color: adminSubTab === 'scheduler' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  border: '1px solid',
+                  borderColor: adminSubTab === 'scheduler' ? 'var(--border-active)' : 'transparent',
+                  fontWeight: 600
+                }}
+              >
+                Agendar Partidos
+              </button>
+            </div>
+
+            {/* Renderizado Condicional de Sub-vistas Admin */}
+            {adminSubTab === 'whitelist' ? (
+              <WhitelistManager 
+                entries={whitelistEntries}
+                onAddEmail={handleAddEmail}
+                onRemoveEmail={handleRemoveEmail}
+                loading={whitelistLoading}
+                error={whitelistError}
+                successMessage={whitelistSuccess}
+              />
+            ) : (
+              <MatchScheduler 
+                onScheduleMatch={handleScheduleMatch}
+                loading={adminSchedulingLoading}
+                error={adminSchedulingError}
+                successMessage={adminSchedulingSuccess}
+              />
+            )}
+          </div>
         )}
 
         {memberView === 'profile' && (
