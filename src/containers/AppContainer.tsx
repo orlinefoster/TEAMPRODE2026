@@ -11,6 +11,7 @@ import { MatchScheduler } from '../components/admin/MatchScheduler';
 import { ProdeForm } from '../components/prode/ProdeForm';
 import { ScenarioSimulator } from '../components/prode/ScenarioSimulator';
 import { ParticipantsTable } from '../components/prode/ParticipantsTable';
+import { Leaderboard } from '../components/prode/Leaderboard';
 import type { WhitelistEntry, Match, Prediction, UserProfile } from '../types';
 import { 
   collection, 
@@ -532,16 +533,28 @@ export const AppContainer: React.FC = () => {
         )}
 
         {memberView === 'leaderboard' && (
-          <div className="glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
-            <span style={{ fontSize: '3.5rem' }}>📊</span>
-            <h2 style={{ fontSize: '2rem', fontWeight: 800, marginTop: '20px', marginBottom: '10px' }}>Tabla Social y Rankings</h2>
-            <p style={{ color: 'var(--text-muted)', maxWidth: '500px', margin: '0 auto 25px', lineHeight: 1.6 }}>
-              Seguí las puntuaciones de tus amigos y rivales en tiempo real. 
-              ¡Estadísticas y rankings globales disponibles en la Etapa 5!
-            </p>
-            <div style={{ display: 'inline-flex', padding: '12px 24px', backgroundColor: 'var(--bg-overlay)', border: '1px dashed var(--accent-gold)', borderRadius: '8px', color: 'var(--accent-gold)', fontWeight: 600 }}>
-              Planificado para la Etapa 5 🚀
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+            <Leaderboard 
+              users={participants}
+              onSelectUser={handleSelectParticipant}
+            />
+
+            {/* Panel flotante de detalle si seleccionan un usuario */}
+            {selectedParticipantDetail && (
+              <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto' }}>
+                <ParticipantsTable 
+                  users={participants}
+                  onSelectUser={handleSelectParticipant}
+                  selectedUser={selectedParticipantDetail}
+                  selectedUserPredictions={selectedParticipantPreds}
+                  matches={matches}
+                  onClosePredictionsPanel={() => {
+                    setSelectedParticipantDetail(null);
+                    setSelectedParticipantPreds([]);
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
 
