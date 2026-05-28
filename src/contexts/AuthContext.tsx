@@ -9,8 +9,9 @@ import {
   updateProfile
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, IS_MOCK_ENV } from '../services/firebase';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage, IS_MOCK_ENV } from '../services/firebase';
 import type { UserProfile, UserRole } from '../types';
 
 interface AuthContextType {
@@ -23,6 +24,7 @@ interface AuthContextType {
   register: (email: string, pass: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updateUserProfile: (displayName: string, photoURL: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -53,12 +55,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (IS_MOCK_ENV) {
       // En entorno Mock, iniciamos sesión automáticamente con un usuario admin local
       console.log('💡 Auth: Cargando perfil mock de administrador.');
-      setUser(MOCK_USER);
+      
+      // Asegurarse de que el usuario administrador de prueba esté guardado en prode_users
+      const usersJson = localStorage.getItem('prode_users') || '[]';
+      const usersList: UserProfile[] = JSON.parse(usersJson);
+      let localAdmin = usersList.find(u => u.uid === MOCK_USER.uid);
+      if (!localAdmin) {
+        usersList.push(MOCK_USER);
+        localStorage.setItem('prode_users', JSON.stringify(usersList));
+        localAdmin = MOCK_USER;
+      }
+
+      setUser(localAdmin);
       setFirebaseUser({
-        uid: MOCK_USER.uid,
-        email: MOCK_USER.email,
-        displayName: MOCK_USER.displayName,
-        photoURL: MOCK_USER.photoURL,
+        uid: localAdmin.uid,
+        email: localAdmin.email,
+        displayName: localAdmin.displayName,
+        photoURL: localAdmin.photoURL,
       } as FirebaseUser);
       setLoading(false);
       return;
@@ -107,7 +120,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Login clásico
   const login = async (email: string, pass: string) => {
     if (IS_MOCK_ENV) {
-      if (email === MOCK_USER.email && pass === 'password') {
+      const usersJson = localStorage.getItem('prode_users') || '[]';
+      const usersList: UserProfile[] = JSON.parse(usersJson);
+      const matchedUser = usersList.find(u => u.email === email);
+
+      if (matchedUser && pass === 'password') {
+        setUser(matchedUser);
+        setFirebaseUser({
+          uid: matchedUser.uid,
+          email: matchedUser.email,
+          displayName: matchedUser.displayName,
+          photoURL: matchedUser.photoURL
+        } as FirebaseUser);
+        setError(null);
+      } else if (email === MOCK_USER.email && pass === 'password') {
         setUser(MOCK_USER);
         setError(null);
       } else {
@@ -143,7 +169,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         exactMatchesCount: 0,
         outcomeMatchesCount: 0
       };
+      
+      const usersJson = localStorage.getItem('prode_users') || '[]';
+      const usersList = JSON.parse(usersJson);
+      usersList.push(mockNewUser);
+      localStorage.setItem('prode_users', JSON.stringify(usersList));
+
       setUser(mockNewUser);
+      setFirebaseUser({
+        uid: mockNewUser.uid,
+        email: mockNewUser.email,
+        displayName: mockNewUser.displayName,
+        photoURL: mockNewUser.photoURL
+      } as FirebaseUser);
       setError(null);
       return;
     }
@@ -232,6 +270,90 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Actualizar perfil de usuario
+  const updateUserProfile = async (displayName: string, photoURL: string) => {
+    if (IS_MOCK_ENV) {
+      if (!user) return;
+      const updatedUser: UserProfile = {
+        ...user,
+        displayName,
+        photoURL
+      };
+
+      setUser(updatedUser);
+      if (firebaseUser) {
+        setFirebaseUser({
+          ...firebaseUser,
+          displayName,
+          photoURL
+        } as FirebaseUser);
+      }
+
+      // Actualizar en localStorage
+      const usersJson = localStorage.getItem('prode_users') || '[]';
+      const usersList: UserProfile[] = JSON.parse(usersJson);
+      const userIndex = usersList.findIndex(u => u.uid === user.uid);
+      if (userIndex !== -1) {
+        usersList[userIndex].displayName = displayName;
+        usersList[userIndex].photoURL = photoURL;
+        localStorage.setItem('prode_users', JSON.stringify(usersList));
+      }
+      console.log('👤 Profile: Perfil de participante mock actualizado en LocalStorage.');
+      return;
+    }
+
+    if (!user || !firebaseUser) {
+      throw new Error('No hay sesión de usuario activa para actualizar.');
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      let finalPhotoURL = photoURL;
+
+      // Si la foto es un Data URL de base64 (imagen cargada localmente), la subimos a Storage
+      if (photoURL.startsWith('data:image/')) {
+        const storageRef = ref(storage, `users/${user.uid}/avatar.jpg`);
+        await uploadString(storageRef, photoURL, 'data_url');
+        finalPhotoURL = await getDownloadURL(storageRef);
+      }
+
+      // 1. Actualizar perfil nativo de Firebase Auth
+      await updateProfile(firebaseUser, {
+        displayName,
+        photoURL: finalPhotoURL
+      });
+
+      // 2. Actualizar documento en Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, {
+        displayName,
+        photoURL: finalPhotoURL
+      });
+
+      // 3. Actualizar estados locales
+      const updatedProfile: UserProfile = {
+        ...user,
+        displayName,
+        photoURL: finalPhotoURL
+      };
+      setUser(updatedProfile);
+      setFirebaseUser({
+        ...firebaseUser,
+        displayName,
+        photoURL: finalPhotoURL
+      } as FirebaseUser);
+
+      console.log('👤 DB: Perfil y avatar actualizados con éxito en Firebase.');
+    } catch (err: any) {
+      console.error('Error al actualizar perfil de usuario:', err);
+      setError(translateError(err.code || err.message));
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Helper para traducción de errores Firebase Auth a Español
   const translateError = (code: string): string => {
     switch (code) {
@@ -269,6 +391,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       register,
       logout,
       resetPassword,
+      updateUserProfile,
       clearError
     }}>
       {children}

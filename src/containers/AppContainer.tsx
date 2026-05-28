@@ -13,6 +13,7 @@ import { ScenarioSimulator } from '../components/prode/ScenarioSimulator';
 import { ParticipantsTable } from '../components/prode/ParticipantsTable';
 import { Leaderboard } from '../components/prode/Leaderboard';
 import { GhostCreator } from '../components/admin/GhostCreator';
+import { UserProfileEditor } from '../components/profile/UserProfileEditor';
 import type { WhitelistEntry, Match, Prediction, UserProfile } from '../types';
 import { 
   collection, 
@@ -50,7 +51,7 @@ const INITIAL_MOCK_WHITELIST: WhitelistEntry[] = [
 ];
 
 export const AppContainer: React.FC = () => {
-  const { user, loading, error, login, register, logout, resetPassword, clearError } = useAuth();
+  const { user, loading, error, login, register, logout, resetPassword, updateUserProfile, clearError } = useAuth();
   
   // Ruteador SPA básico y ultra-resiliente
   const [guestView, setGuestView] = useState<GuestView>('login');
@@ -85,6 +86,11 @@ export const AppContainer: React.FC = () => {
   const [adminGhostError, setAdminGhostError] = useState<string | null>(null);
   const [adminGhostSuccess, setAdminGhostSuccess] = useState<string | null>(null);
   const [loadingGhostRandomization, setLoadingGhostRandomization] = useState(false);
+
+  // Estados para el perfil de usuario (Etapa 6)
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
 
   // Estados específicos para las Predicciones (Prode)
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -205,6 +211,8 @@ export const AppContainer: React.FC = () => {
     setAdminSchedulingSuccess(null);
     setAdminGhostError(null);
     setAdminGhostSuccess(null);
+    setProfileError(null);
+    setProfileSuccess(null);
     setSelectedParticipantDetail(null);
     setSelectedParticipantPreds([]);
     setMemberView(view);
@@ -380,6 +388,40 @@ export const AppContainer: React.FC = () => {
       alert('Hubo un error al guardar tu predicción. Reintentá.');
     } finally {
       setSavingPredictionMatchId(null);
+    }
+  };
+
+  // Acción Usuario: Actualizar Perfil de Participante (Etapa 6)
+  const handleUpdateProfile = async (displayName: string, photoURL: string) => {
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+    try {
+      await updateUserProfile(displayName, photoURL);
+      setProfileSuccess('¡Tu perfil de participante se actualizó con éxito!');
+      await loadPredictionsAndParticipants();
+    } catch (err: any) {
+      console.error('Error al actualizar perfil:', err);
+      setProfileError(err.message || 'Ocurrió un error al actualizar los datos.');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  // Acción Usuario: Solicitar restablecimiento de contraseña
+  const handleTriggerPasswordReset = async () => {
+    if (!user) return;
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+    try {
+      await resetPassword(user.email);
+      setProfileSuccess(`Te enviamos un correo electrónico a ${user.email} para restablecer tu clave.`);
+    } catch (err: any) {
+      console.error('Error al enviar correo de restablecimiento:', err);
+      setProfileError(err.message || 'No se pudo enviar el correo de restablecimiento.');
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -703,40 +745,14 @@ export const AppContainer: React.FC = () => {
         )}
 
         {memberView === 'profile' && (
-          <div className="glass-panel" style={{ padding: '40px', maxWidth: '600px', margin: '0 auto' }}>
-            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-              <img 
-                src={user.photoURL} 
-                alt={user.displayName} 
-                style={{ width: '100px', height: '100px', borderRadius: '50%', border: '3px solid var(--accent-gold)', objectFit: 'cover', marginBottom: '15px' }} 
-              />
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>{user.displayName}</h2>
-              <span style={{ display: 'inline-block', backgroundColor: 'var(--bg-overlay)', border: '1px solid var(--border-light)', padding: '4px 12px', borderRadius: '50px', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px', textTransform: 'uppercase', fontWeight: 600 }}>
-                Rol: {user.role}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--bg-overlay)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Correo Electrónico:</span>
-                <span style={{ fontWeight: 600 }}>{user.email}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--bg-overlay)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Puntos Acumulados:</span>
-                <span style={{ fontWeight: 700, color: 'var(--accent-gold)' }}>{user.points} pts</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--bg-overlay)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Prode Completado:</span>
-                <span style={{ fontWeight: 600, color: user.completedProde ? 'var(--accent-green)' : 'var(--text-muted)' }}>
-                  {user.completedProde ? '✅ Sí (Listo)' : '❌ Pendiente'}
-                </span>
-              </div>
-            </div>
-            
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '30px' }}>
-              * La edición de perfil y carga de fotos estarán disponibles en la Etapa 6.
-            </p>
-          </div>
+          <UserProfileEditor 
+            user={user}
+            onUpdateProfile={handleUpdateProfile}
+            onTriggerPasswordReset={handleTriggerPasswordReset}
+            loading={profileLoading}
+            error={profileError}
+            successMessage={profileSuccess}
+          />
         )}
       </main>
 
