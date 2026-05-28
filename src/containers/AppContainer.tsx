@@ -5,7 +5,9 @@ import { RegisterForm } from '../components/auth/RegisterForm';
 import { ForgotPasswordForm } from '../components/auth/ForgotPasswordForm';
 import { Navbar } from '../components/common/Navbar';
 import { WhitelistManager } from '../components/admin/WhitelistManager';
-import type { WhitelistEntry } from '../types';
+import { MatchList } from '../components/prode/MatchList';
+import { MatchScoreModal } from '../components/admin/MatchScoreModal';
+import type { WhitelistEntry, Match } from '../types';
 import { 
   collection, 
   onSnapshot, 
@@ -17,6 +19,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from '../services/firebase';
+import { seedWorldCupMatches, getMatchesFromDB, updateMatchResultInDB } from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
 type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile';
@@ -39,6 +42,34 @@ export const AppContainer: React.FC = () => {
   const [whitelistLoading, setWhitelistLoading] = useState(false);
   const [whitelistError, setWhitelistError] = useState<string | null>(null);
   const [whitelistSuccess, setWhitelistSuccess] = useState<string | null>(null);
+
+  // Estados específicos para los Partidos y Calendario
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [selectedMatchToEdit, setSelectedMatchToEdit] = useState<Match | null>(null);
+  const [adminSavingResult, setAdminSavingResult] = useState(false);
+
+  // 1. Auto-sembrar e inicializar partidos al cargar
+  useEffect(() => {
+    if (!user) return;
+
+    const initializeMatches = async () => {
+      setMatchesLoading(true);
+      try {
+        await seedWorldCupMatches();
+        const loadedMatches = await getMatchesFromDB();
+        setMatches(loadedMatches);
+      } catch (err) {
+        console.error('Error inicializando partidos:', err);
+        setMatchesError('No se pudieron cargar los partidos del mundial.');
+      } finally {
+        setMatchesLoading(false);
+      }
+    };
+
+    initializeMatches();
+  }, [user]);
 
   // Escuchar a la Whitelist en tiempo real (si es Admin y no es Mock)
   useEffect(() => {
@@ -82,6 +113,7 @@ export const AppContainer: React.FC = () => {
   const handleNavigateMember = (view: MemberView) => {
     setWhitelistError(null);
     setWhitelistSuccess(null);
+    setMatchesError(null);
     setMemberView(view);
   };
 
@@ -150,6 +182,23 @@ export const AppContainer: React.FC = () => {
     }
   };
 
+  // Acción Admin: Cargar / Editar un resultado real
+  const handleSaveMatchResult = async (matchId: string, homeScore: number, awayScore: number) => {
+    setAdminSavingResult(true);
+    try {
+      await updateMatchResultInDB(matchId, homeScore, awayScore);
+      
+      // Recargar partidos de la DB para actualizar UI
+      const updatedMatches = await getMatchesFromDB();
+      setMatches(updatedMatches);
+    } catch (err) {
+      console.error('Error guardando resultado de partido:', err);
+      throw err;
+    } finally {
+      setAdminSavingResult(false);
+    }
+  };
+
   // 1. Pantalla de Carga Shimmer Premium
   if (loading) {
     return (
@@ -204,6 +253,8 @@ export const AppContainer: React.FC = () => {
     );
   }
 
+  const isAdmin = user.role === 'admin';
+
   // 3. Ruteador para Miembros (Autenticados)
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-main)' }}>
@@ -216,16 +267,36 @@ export const AppContainer: React.FC = () => {
 
       <main className="container" style={{ flex: 1, padding: '40px 20px' }}>
         {memberView === 'prode' && (
-          <div className="glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
-            <span style={{ fontSize: '3.5rem' }}>⚽</span>
-            <h2 style={{ fontSize: '2rem', fontWeight: 800, marginTop: '20px', marginBottom: '10px' }}>Mi Prode Mundialista</h2>
-            <p style={{ color: 'var(--text-muted)', maxWidth: '500px', margin: '0 auto 25px', lineHeight: 1.6 }}>
-              Acá vas a poder llenar tus predicciones gol a gol para toda la fase de grupos del mundial. 
-              ¡Próximamente disponible en la Etapa 4!
-            </p>
-            <div style={{ display: 'inline-flex', padding: '12px 24px', backgroundColor: 'var(--bg-overlay)', border: '1px dashed var(--accent-gold)', borderRadius: '8px', color: 'var(--accent-gold)', fontWeight: 600 }}>
-              Próximo paso del Roadmap de Implementación 📅
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+            {/* Header del Calendario */}
+            <div>
+              <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', marginBottom: '8px' }}>
+                Calendario Oficial del Mundial 2026
+              </h2>
+              <p style={{ color: 'var(--text-muted)' }}>
+                Fase de Grupos • Seguimiento de marcadores reales y administración del torneo.
+              </p>
             </div>
+
+            {matchesError && (
+              <div style={{ backgroundColor: 'RGBA(239, 68, 68, 0.1)', border: '1px solid var(--accent-error)', color: 'var(--text-main)', padding: '12px 16px', borderRadius: '8px' }}>
+                ⚠️ {matchesError}
+              </div>
+            )}
+
+            {matchesLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="skeleton" style={{ height: '80px', borderRadius: '12px' }}></div>
+                ))}
+              </div>
+            ) : (
+              <MatchList 
+                matches={matches} 
+                isAdmin={isAdmin}
+                onEditMatch={(match) => setSelectedMatchToEdit(match)}
+              />
+            )}
           </div>
         )}
 
@@ -243,7 +314,7 @@ export const AppContainer: React.FC = () => {
           </div>
         )}
 
-        {memberView === 'whitelist' && user.role === 'admin' && (
+        {memberView === 'whitelist' && isAdmin && (
           <WhitelistManager 
             entries={whitelistEntries}
             onAddEmail={handleAddEmail}
@@ -291,6 +362,16 @@ export const AppContainer: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Modal flotante de Carga de Resultado */}
+      {selectedMatchToEdit && (
+        <MatchScoreModal 
+          match={selectedMatchToEdit}
+          onClose={() => setSelectedMatchToEdit(null)}
+          onSaveResult={handleSaveMatchResult}
+          loading={adminSavingResult}
+        />
+      )}
     </div>
   );
 };
