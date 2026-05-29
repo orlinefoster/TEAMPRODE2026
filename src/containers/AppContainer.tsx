@@ -10,6 +10,7 @@ import { MatchScoreModal } from '../components/admin/MatchScoreModal';
 import { MatchScheduler } from '../components/admin/MatchScheduler';
 import { ProdeForm } from '../components/prode/ProdeForm';
 import { ScenarioSimulator } from '../components/prode/ScenarioSimulator';
+import { DashboardStats } from '../components/prode/DashboardStats';
 import { ParticipantsTable } from '../components/prode/ParticipantsTable';
 import { Leaderboard } from '../components/prode/Leaderboard';
 import { GhostCreator } from '../components/admin/GhostCreator';
@@ -41,7 +42,7 @@ import {
 
 type GuestView = 'login' | 'register' | 'forgot';
 type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile';
-type ProdeSubTab = 'fill' | 'calendar' | 'scenario' | 'participants';
+type ProdeSubTab = 'fill' | 'calendar' | 'scenario' | 'stats' | 'participants';
 type AdminSubTab = 'whitelist' | 'scheduler' | 'ghosts';
 
 // Mock inicial de correos permitidos para desarrollo local
@@ -58,7 +59,7 @@ export const AppContainer: React.FC = () => {
   const [memberView, setMemberView] = useState<MemberView>('prode');
   
   // Sub-navegación dentro de "Mi Prode"
-  const [prodeSubTab, setProdeSubTab] = useState<ProdeSubTab>('fill');
+  const [prodeSubTab, setProdeSubTab] = useState<ProdeSubTab>('stats');
 
   // Sub-navegación exclusiva para panel de administración
   const [adminSubTab, setAdminSubTab] = useState<AdminSubTab>('whitelist');
@@ -561,6 +562,20 @@ export const AppContainer: React.FC = () => {
                   🔮 Modo Escenario
                 </button>
                 <button
+                  onClick={() => setProdeSubTab('stats')}
+                  className="btn"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: '0.85rem',
+                    borderRadius: '6px',
+                    backgroundColor: prodeSubTab === 'stats' ? 'var(--border-light)' : 'transparent',
+                    color: prodeSubTab === 'stats' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    fontWeight: 600
+                  }}
+                >
+                  📊 Estadísticas
+                </button>
+                <button
                   onClick={() => setProdeSubTab('participants')}
                   className="btn"
                   style={{
@@ -608,6 +623,9 @@ export const AppContainer: React.FC = () => {
                     allPredictions={allPredictions}
                     users={participants}
                   />
+                )}
+                {prodeSubTab === 'stats' && (
+                  <DashboardStats users={participants} />
                 )}
                 {prodeSubTab === 'participants' && (
                   <ParticipantsTable 
