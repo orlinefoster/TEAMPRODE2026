@@ -6,21 +6,19 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "site": "teamprode2026",
-    "public": "dist",
+    "source": ".",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
+    "frameworksBackend": {
+      "region": "us-central1"
+    }
   },
   "auth": {
-    "providers": {}
+    "providers": {
+      "emailPassword": true
+    }
   }
 }

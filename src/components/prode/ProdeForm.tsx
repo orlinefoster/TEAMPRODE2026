@@ -9,7 +9,7 @@ interface ProdeFormProps {
   savedMatchId: string | null;
 }
 
-const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'Eliminatorias'];
 
 export const ProdeForm: React.FC<ProdeFormProps> = ({
   matches,
@@ -65,7 +65,12 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
     await onSavePrediction(matchId, homeVal, awayVal);
   };
 
-  const groupMatches = matches.filter((m) => m.group === selectedGroup);
+  const groupMatches = matches.filter((m) => {
+    if (selectedGroup === 'Eliminatorias') {
+      return m.phase && m.phase !== 'Fase de grupos';
+    }
+    return m.group === selectedGroup && m.phase === 'Fase de grupos';
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
@@ -73,9 +78,15 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
       <div className="glass-panel" style={{ padding: '15px 20px', overflowX: 'auto', display: 'flex', gap: '8px' }}>
         {GROUPS.map((g) => {
           // Contar cuántos partidos de este grupo ya predijo el usuario
-          const groupMatchIds = matches.filter(m => m.group === g).map(m => m.matchId);
+          const groupMatchIds = matches.filter(m => {
+            if (g === 'Eliminatorias') {
+              return m.phase && m.phase !== 'Fase de grupos';
+            }
+            return m.group === g && m.phase === 'Fase de grupos';
+          }).map(m => m.matchId);
+          
           const predictedInGroup = predictions.filter(p => groupMatchIds.includes(p.matchId)).length;
-          const isGroupCompleted = predictedInGroup >= 2; // Cada grupo sembrado tiene 2 partidos clásicos
+          const isGroupCompleted = groupMatchIds.length > 0 && predictedInGroup >= groupMatchIds.length;
 
           return (
             <button
@@ -94,7 +105,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
                 position: 'relative'
               }}
             >
-              Grupo {g}
+              {g === 'Eliminatorias' ? g : `Grupo ${g}`}
               {isGroupCompleted && (
                 <span style={{
                   position: 'absolute',
@@ -146,6 +157,11 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                   {matchDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} • {matchDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} HS
                 </span>
+                {match.stadium && match.city && (
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                    📍 {match.stadium}, {match.city}
+                  </span>
+                )}
                 {match.status === 'played' && (
                   <span style={{
                     fontSize: '0.75rem',

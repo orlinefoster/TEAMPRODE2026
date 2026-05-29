@@ -1,0 +1,650 @@
+[
+  {
+    "grupo": "Grupo A",
+    "fecha": "11-06-2026",
+    "hora": "16:00",
+    "equipo_1": "México",
+    "equipo_2": "Sudáfrica",
+    "estadio": "Estadio Ciudad de México",
+    "ciudad": "Ciudad de México"
+  },
+  {
+    "grupo": "Grupo A",
+    "fecha": "11-06-2026",
+    "hora": "23:00",
+    "equipo_1": "República de Corea",
+    "equipo_2": "Chequia",
+    "estadio": "Estadio Guadalajara",
+    "ciudad": "Guadalajara"
+  },
+  {
+    "grupo": "Grupo B",
+    "fecha": "12-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Canadá",
+    "equipo_2": "Bosnia y Herzegovina",
+    "estadio": "Estadio de Toronto",
+    "ciudad": "Toronto"
+  },
+  {
+    "grupo": "Grupo D",
+    "fecha": "12-06-2026",
+    "hora": "22:00",
+    "equipo_1": "EE. UU.",
+    "equipo_2": "Paraguay",
+    "estadio": "Estadio Los Angeles",
+    "ciudad": "Los Ángeles"
+  },
+  {
+    "grupo": "Grupo B",
+    "fecha": "13-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Catar",
+    "equipo_2": "Suiza",
+    "estadio": "Estadio de la Bahía de San Francisco",
+    "ciudad": "Área de la Bahía de San Francisco"
+  },
+  {
+    "grupo": "Grupo C",
+    "fecha": "13-06-2026",
+    "hora": "19:00",
+    "equipo_1": "Brasil",
+    "equipo_2": "Marruecos",
+    "estadio": "Estadio Nueva York/Nueva Jersey",
+    "ciudad": "Nueva York"
+  },
+  {
+    "grupo": "Grupo C",
+    "fecha": "13-06-2026",
+    "hora": "22:00",
+    "equipo_1": "Haití",
+    "equipo_2": "Escocia",
+    "estadio": "Estadio Boston",
+    "ciudad": "Boston"
+  },
+  {
+    "grupo": "Grupo D",
+    "fecha": "14-06-2026",
+    "hora": "01:00",
+    "equipo_1": "Australia",
+    "equipo_2": "Turquía",
+    "estadio": "Estadio BC Place Vancouver",
+    "ciudad": "Vancouver"
+  },
+  {
+    "grupo": "Grupo E",
+    "fecha": "14-06-2026",
+    "hora": "14:00",
+    "equipo_1": "Alemania",
+    "equipo_2": "Curazao",
+    "estadio": "Estadio Houston",
+    "ciudad": "Houston"
+  },
+  {
+    "grupo": "Grupo F",
+    "fecha": "14-06-2026",
+    "hora": "17:00",
+    "equipo_1": "Países Bajos",
+    "equipo_2": "Japón",
+    "estadio": "Estadio Dallas",
+    "ciudad": "Dallas"
+  },
+  {
+    "grupo": "Grupo E",
+    "fecha": "14-06-2026",
+    "hora": "20:00",
+    "equipo_1": "Costa de Marfil",
+    "equipo_2": "Ecuador",
+    "estadio": "Estadio Filadelfia",
+    "ciudad": "Filadelfia"
+  },
+  {
+    "grupo": "Grupo F",
+    "fecha": "14-06-2026",
+    "hora": "23:00",
+    "equipo_1": "Suecia",
+    "equipo_2": "Túnez",
+    "estadio": "Estadio Monterrey",
+    "ciudad": "Monterrey"
+  },
+  {
+    "grupo": "Grupo H",
+    "fecha": "15-06-2026",
+    "hora": "13:00",
+    "equipo_1": "España",
+    "equipo_2": "Islas de Cabo Verde",
+    "estadio": "Estadio Atlanta",
+    "ciudad": "Atlanta"
+  },
+  {
+    "grupo": "Grupo G",
+    "fecha": "15-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Bélgica",
+    "equipo_2": "Egipto",
+    "estadio": "Estadio de Seattle",
+    "ciudad": "Seattle"
+  },
+  {
+    "grupo": "Grupo H",
+    "fecha": "15-06-2026",
+    "hora": "19:00",
+    "equipo_1": "Arabia Saudí",
+    "equipo_2": "Uruguay",
+    "estadio": "Estadio Miami",
+    "ciudad": "Miami"
+  },
+  {
+    "grupo": "Grupo G",
+    "fecha": "15-06-2026",
+    "hora": "22:00",
+    "equipo_1": "RI de Irán",
+    "equipo_2": "Nueva Zelanda",
+    "estadio": "Estadio Los Angeles",
+    "ciudad": "Los Ángeles"
+  },
+  {
+    "grupo": "Grupo I",
+    "fecha": "16-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Francia",
+    "equipo_2": "Senegal",
+    "estadio": "Estadio Nueva York/Nueva Jersey",
+    "ciudad": "Nueva York"
+  },
+  {
+    "grupo": "Grupo I",
+    "fecha": "16-06-2026",
+    "hora": "19:00",
+    "equipo_1": "Irak",
+    "equipo_2": "Noruega",
+    "estadio": "Estadio Boston",
+    "ciudad": "Boston"
+  },
+  {
+    "grupo": "Grupo J",
+    "fecha": "16-06-2026",
+    "hora": "22:00",
+    "equipo_1": "Argentina",
+    "equipo_2": "Argelia",
+    "estadio": "Estadio Kansas City",
+    "ciudad": "Kansas City"
+  },
+  {
+    "grupo": "Grupo J",
+    "fecha": "17-06-2026",
+    "hora": "01:00",
+    "equipo_1": "Austria",
+    "equipo_2": "Jordania",
+    "estadio": "Estadio de la Bahía de San Francisco",
+    "ciudad": "Área de la Bahía de San Francisco"
+  },
+  {
+    "grupo": "Grupo K",
+    "fecha": "17-06-2026",
+    "hora": "14:00",
+    "equipo_1": "Portugal",
+    "equipo_2": "RD Congo",
+    "estadio": "Estadio Houston",
+    "ciudad": "Houston"
+  },
+  {
+    "grupo": "Grupo L",
+    "fecha": "17-06-2026",
+    "hora": "17:00",
+    "equipo_1": "Inglaterra",
+    "equipo_2": "Croacia",
+    "estadio": "Estadio Dallas",
+    "ciudad": "Dallas"
+  },
+  {
+    "grupo": "Grupo L",
+    "fecha": "17-06-2026",
+    "hora": "20:00",
+    "equipo_1": "Ghana",
+    "equipo_2": "Panamá",
+    "estadio": "Estadio de Toronto",
+    "ciudad": "Toronto"
+  },
+  {
+    "grupo": "Grupo K",
+    "fecha": "17-06-2026",
+    "hora": "23:00",
+    "equipo_1": "Uzbekistán",
+    "equipo_2": "Colombia",
+    "estadio": "Estadio Ciudad de México",
+    "ciudad": "Ciudad de México"
+  },
+  {
+    "grupo": "Grupo A",
+    "fecha": "18-06-2026",
+    "hora": "13:00",
+    "equipo_1": "Chequia",
+    "equipo_2": "Sudáfrica",
+    "estadio": "Estadio Atlanta",
+    "ciudad": "Atlanta"
+  },
+  {
+    "grupo": "Grupo B",
+    "fecha": "18-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Suiza",
+    "equipo_2": "Bosnia y Herzegovina",
+    "estadio": "Estadio Los Angeles",
+    "ciudad": "Los Ángeles"
+  },
+  {
+    "grupo": "Grupo B",
+    "fecha": "18-06-2026",
+    "hora": "19:00",
+    "equipo_1": "Canadá",
+    "equipo_2": "Catar",
+    "estadio": "Estadio BC Place Vancouver",
+    "ciudad": "Vancouver"
+  },
+  {
+    "grupo": "Grupo A",
+    "fecha": "18-06-2026",
+    "hora": "22:00",
+    "equipo_1": "México",
+    "equipo_2": "República de Corea",
+    "estadio": "Estadio Guadalajara",
+    "ciudad": "Guadalajara"
+  },
+  {
+    "grupo": "Grupo D",
+    "fecha": "19-06-2026",
+    "hora": "16:00",
+    "equipo_1": "EE. UU.",
+    "equipo_2": "Australia",
+    "estadio": "Estadio de Seattle",
+    "ciudad": "Seattle"
+  },
+  {
+    "grupo": "Grupo C",
+    "fecha": "19-06-2026",
+    "hora": "19:00",
+    "equipo_1": "Escocia",
+    "equipo_2": "Marruecos",
+    "estadio": "Estadio Boston",
+    "ciudad": "Boston"
+  },
+  {
+    "grupo": "Grupo C",
+    "fecha": "19-06-2026",
+    "hora": "21:30",
+    "equipo_1": "Brasil",
+    "equipo_2": "Haití",
+    "estadio": "Estadio Filadelfia",
+    "ciudad": "Filadelfia"
+  },
+  {
+    "grupo": "Grupo D",
+    "fecha": "20-06-2026",
+    "hora": "00:00",
+    "equipo_1": "Turquía",
+    "equipo_2": "Paraguay",
+    "estadio": "Estadio de la Bahía de San Francisco",
+    "ciudad": "Área de la Bahía de San Francisco"
+  },
+  {
+    "grupo": "Grupo F",
+    "fecha": "20-06-2026",
+    "hora": "14:00",
+    "equipo_1": "Países Bajos",
+    "equipo_2": "Suecia",
+    "estadio": "Estadio Houston",
+    "ciudad": "Houston"
+  },
+  {
+    "grupo": "Grupo E",
+    "fecha": "20-06-2026",
+    "hora": "17:00",
+    "equipo_1": "Alemania",
+    "equipo_2": "Costa de Marfil",
+    "estadio": "Estadio de Toronto",
+    "ciudad": "Toronto"
+  },
+  {
+    "grupo": "Grupo E",
+    "fecha": "20-06-2026",
+    "hora": "21:00",
+    "equipo_1": "Ecuador",
+    "equipo_2": "Curazao",
+    "estadio": "Estadio Kansas City",
+    "ciudad": "Kansas City"
+  },
+  {
+    "grupo": "Grupo F",
+    "fecha": "21-06-2026",
+    "hora": "01:00",
+    "equipo_1": "Túnez",
+    "equipo_2": "Japón",
+    "estadio": "Estadio Monterrey",
+    "ciudad": "Monterrey"
+  },
+  {
+    "grupo": "Grupo H",
+    "fecha": "21-06-2026",
+    "hora": "13:00",
+    "equipo_1": "España",
+    "equipo_2": "Arabia Saudí",
+    "estadio": "Estadio Atlanta",
+    "ciudad": "Atlanta"
+  },
+  {
+    "grupo": "Grupo G",
+    "fecha": "21-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Bélgica",
+    "equipo_2": "RI de Irán",
+    "estadio": "Estadio Los Angeles",
+    "ciudad": "Los Ángeles"
+  },
+  {
+    "grupo": "Grupo H",
+    "fecha": "21-06-2026",
+    "hora": "19:00",
+    "equipo_1": "Uruguay",
+    "equipo_2": "Islas de Cabo Verde",
+    "estadio": "Estadio Miami",
+    "ciudad": "Miami"
+  },
+  {
+    "grupo": "Grupo G",
+    "fecha": "21-06-2026",
+    "hora": "22:00",
+    "equipo_1": "Nueva Zelanda",
+    "equipo_2": "Egipto",
+    "estadio": "Estadio BC Place Vancouver",
+    "ciudad": "Vancouver"
+  },
+  {
+    "grupo": "Grupo J",
+    "fecha": "22-06-2026",
+    "hora": "14:00",
+    "equipo_1": "Argentina",
+    "equipo_2": "Austria",
+    "estadio": "Estadio Dallas",
+    "ciudad": "Dallas"
+  },
+  {
+    "grupo": "Grupo I",
+    "fecha": "22-06-2026",
+    "hora": "18:00",
+    "equipo_1": "Francia",
+    "equipo_2": "Irak",
+    "estadio": "Estadio Filadelfia",
+    "ciudad": "Filadelfia"
+  },
+  {
+    "grupo": "Grupo I",
+    "fecha": "22-06-2026",
+    "hora": "21:00",
+    "equipo_1": "Noruega",
+    "equipo_2": "Senegal",
+    "estadio": "Estadio Nueva York/Nueva Jersey",
+    "ciudad": "Nueva York"
+  },
+  {
+    "grupo": "Grupo J",
+    "fecha": "23-06-2026",
+    "hora": "00:00",
+    "equipo_1": "Jordania",
+    "equipo_2": "Argelia",
+    "estadio": "Estadio de la Bahía de San Francisco",
+    "ciudad": "Área de la Bahía de San Francisco"
+  },
+  {
+    "grupo": "Grupo K",
+    "fecha": "23-06-2026",
+    "hora": "14:00",
+    "equipo_1": "Portugal",
+    "equipo_2": "Uzbekistán",
+    "estadio": "Estadio Houston",
+    "ciudad": "Houston"
+  },
+  {
+    "grupo": "Grupo L",
+    "fecha": "23-06-2026",
+    "hora": "17:00",
+    "equipo_1": "Inglaterra",
+    "equipo_2": "Ghana",
+    "estadio": "Estadio Boston",
+    "ciudad": "Boston"
+  },
+  {
+    "grupo": "Grupo L",
+    "fecha": "23-06-2026",
+    "hora": "20:00",
+    "equipo_1": "Panamá",
+    "equipo_2": "Croacia",
+    "estadio": "Estadio de Toronto",
+    "ciudad": "Toronto"
+  },
+  {
+    "grupo": "Grupo K",
+    "fecha": "23-06-2026",
+    "hora": "23:00",
+    "equipo_1": "Colombia",
+    "equipo_2": "RD Congo",
+    "estadio": "Estadio Guadalajara",
+    "ciudad": "Guadalajara"
+  },
+  {
+    "grupo": "Grupo B",
+    "fecha": "24-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Suiza",
+    "equipo_2": "Canadá",
+    "estadio": "Estadio BC Place Vancouver",
+    "ciudad": "Vancouver"
+  },
+  {
+    "grupo": "Grupo B",
+    "fecha": "24-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Bosnia y Herzegovina",
+    "equipo_2": "Catar",
+    "estadio": "Estadio de Seattle",
+    "ciudad": "Seattle"
+  },
+  {
+    "grupo": "Grupo C",
+    "fecha": "24-06-2026",
+    "hora": "19:00",
+    "equipo_1": "Escocia",
+    "equipo_2": "Brasil",
+    "estadio": "Estadio Miami",
+    "ciudad": "Miami"
+  },
+  {
+    "grupo": "Grupo C",
+    "fecha": "24-06-2026",
+    "hora": "19:00",
+    "equipo_1": "Marruecos",
+    "equipo_2": "Haití",
+    "estadio": "Estadio Atlanta",
+    "ciudad": "Atlanta"
+  },
+  {
+    "grupo": "Grupo A",
+    "fecha": "24-06-2026",
+    "hora": "22:00",
+    "equipo_1": "Chequia",
+    "equipo_2": "México",
+    "estadio": "Estadio Ciudad de México",
+    "ciudad": "Ciudad de México"
+  },
+  {
+    "grupo": "Grupo A",
+    "fecha": "24-06-2026",
+    "hora": "22:00",
+    "equipo_1": "Sudáfrica",
+    "equipo_2": "República de Corea",
+    "estadio": "Estadio Monterrey",
+    "ciudad": "Monterrey"
+  },
+  {
+    "grupo": "Grupo E",
+    "fecha": "25-06-2026",
+    "hora": "17:00",
+    "equipo_1": "Curazao",
+    "equipo_2": "Costa de Marfil",
+    "estadio": "Estadio Filadelfia",
+    "ciudad": "Filadelfia"
+  },
+  {
+    "grupo": "Grupo E",
+    "fecha": "25-06-2026",
+    "hora": "17:00",
+    "equipo_1": "Ecuador",
+    "equipo_2": "Alemania",
+    "estadio": "Estadio Nueva York/Nueva Jersey",
+    "ciudad": "Nueva York"
+  },
+  {
+    "grupo": "Grupo F",
+    "fecha": "25-06-2026",
+    "hora": "20:00",
+    "equipo_1": "Japón",
+    "equipo_2": "Suecia",
+    "estadio": "Estadio Dallas",
+    "ciudad": "Dallas"
+  },
+  {
+    "grupo": "Grupo F",
+    "fecha": "25-06-2026",
+    "hora": "20:00",
+    "equipo_1": "Túnez",
+    "equipo_2": "Países Bajos",
+    "estadio": "Estadio Kansas City",
+    "ciudad": "Kansas City"
+  },
+  {
+    "grupo": "Grupo D",
+    "fecha": "25-06-2026",
+    "hora": "23:00",
+    "equipo_1": "Turquía",
+    "equipo_2": "EE. UU.",
+    "estadio": "Estadio Los Angeles",
+    "ciudad": "Los Ángeles"
+  },
+  {
+    "grupo": "Grupo D",
+    "fecha": "25-06-2026",
+    "hora": "23:00",
+    "equipo_1": "Paraguay",
+    "equipo_2": "Australia",
+    "estadio": "Estadio de la Bahía de San Francisco",
+    "ciudad": "Área de la Bahía de San Francisco"
+  },
+  {
+    "grupo": "Grupo I",
+    "fecha": "26-06-2206",
+    "hora": "16:00",
+    "equipo_1": "Noruega",
+    "equipo_2": "Francia",
+    "estadio": "Estadio Boston",
+    "ciudad": "Boston"
+  },
+  {
+    "grupo": "Grupo I",
+    "fecha": "26-06-2026",
+    "hora": "16:00",
+    "equipo_1": "Senegal",
+    "equipo_2": "Irak",
+    "estadio": "Estadio de Toronto",
+    "ciudad": "Toronto"
+  },
+  {
+    "grupo": "Grupo H",
+    "fecha": "26-06-2026",
+    "hora": "21:00",
+    "equipo_1": "Islas de Cabo Verde",
+    "equipo_2": "Arabia Saudí",
+    "estadio": "Estadio Houston",
+    "ciudad": "Houston"
+  },
+  {
+    "grupo": "Grupo H",
+    "fecha": "26-06-2026",
+    "hora": "21:00",
+    "equipo_1": "Uruguay",
+    "equipo_2": "España",
+    "estadio": "Estadio Guadalajara",
+    "ciudad": "Guadalajara"
+  },
+  {
+    "grupo": "Grupo G",
+    "fecha": "27-06-2026",
+    "hora": "00:00",
+    "equipo_1": "Egipto",
+    "equipo_2": "RI de Irán",
+    "estadio": "Estadio de Seattle",
+    "ciudad": "Seattle"
+  },
+  {
+    "grupo": "Grupo G",
+    "fecha": "27-06-2026",
+    "hora": "00:00",
+    "equipo_1": "Nueva Zelanda",
+    "equipo_2": "Bélgica",
+    "estadio": "Estadio BC Place Vancouver",
+    "ciudad": "Vancouver"
+  },
+  {
+    "grupo": "Grupo L",
+    "fecha": "27-06-2026",
+    "hora": "18:00",
+    "equipo_1": "Panamá",
+    "equipo_2": "Inglaterra",
+    "estadio": "Estadio Nueva York/Nueva Jersey",
+    "ciudad": "Nueva York"
+  },
+  {
+    "grupo": "Grupo L",
+    "fecha": "27-06-2026",
+    "hora": "18:00",
+    "equipo_1": "Croacia",
+    "equipo_2": "Ghana",
+    "estadio": "Estadio Filadelfia",
+    "ciudad": "Filadelfia"
+  },
+  {
+    "grupo": "Grupo K",
+    "fecha": "27-06-2026",
+    "hora": "20:30",
+    "equipo_1": "Colombia",
+    "equipo_2": "Portugal",
+    "estadio": "Estadio Miami",
+    "ciudad": "Miami"
+  },
+  {
+    "grupo": "Grupo K",
+    "fecha": "27-06-2026",
+    "hora": "20:30",
+    "equipo_1": "RD Congo",
+    "equipo_2": "Uzbekistán",
+    "estadio": "Estadio Atlanta",
+    "ciudad": "Atlanta"
+  },
+  {
+    "grupo": "Grupo J",
+    "fecha": "27-06-2026",
+    "hora": "23:00",
+    "equipo_1": "Argelia",
+    "equipo_2": "Austria",
+    "estadio": "Estadio Kansas City",
+    "ciudad": "Kansas City"
+  },
+  {
+    "grupo": "Grupo J",
+    "fecha": "27-06-2026",
+    "hora": "23:00",
+    "equipo_1": "Jordania",
+    "equipo_2": "Argentina",
+    "estadio": "Estadio Dallas",
+    "ciudad": "Dallas"
+  }
+]

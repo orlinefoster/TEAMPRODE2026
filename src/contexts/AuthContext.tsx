@@ -80,6 +80,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
       setFirebaseUser(fUser);
       if (fUser) {
+        setLoading(true);
         try {
           // Obtener perfil del usuario desde Firestore
           const userDocRef = doc(db, 'users', fUser.uid);
@@ -107,11 +108,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } catch (err: any) {
           console.error('Error cargando datos de usuario:', err);
           setError('Error al recuperar datos del perfil.');
+        } finally {
+          setLoading(false);
         }
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -149,9 +152,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err: any) {
       console.error(err);
       setError(translateError(err.code || err.message));
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   };
 
@@ -239,9 +241,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!error) {
         setError(translateError(err.code || err.message));
       }
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   };
 

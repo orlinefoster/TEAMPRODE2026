@@ -30,6 +30,9 @@ export interface Match {
   status: MatchStatus;
   homeScore?: number;
   awayScore?: number;
+  stadium?: string;
+  city?: string;
+  phase?: string;
 }
 
 export interface Prediction {

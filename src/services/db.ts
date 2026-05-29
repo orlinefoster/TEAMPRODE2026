@@ -13,46 +13,58 @@ import {
 import { db, IS_MOCK_ENV } from './firebase';
 import type { Match, Prediction, UserProfile } from '../types';
 import { calculatePoints } from './scoringEngine';
+import partidosRaw from '../../partidos.json';
+import otherFaseRaw from '../../other-fase.json';
 
-// Lista oficial sembrada de 24 partidos clásicos para la fase de grupos del Mundial 2026 (Grupos A al L)
-export const SEED_MATCHES: Match[] = [
-  // Grupo A
-  { matchId: 'm1', group: 'A', homeTeam: 'Estados Unidos', awayTeam: 'Canadá', date: Date.parse('2026-06-11T18:00:00Z'), status: 'pending' },
-  { matchId: 'm2', group: 'A', homeTeam: 'México', awayTeam: 'Italia', date: Date.parse('2026-06-12T20:00:00Z'), status: 'pending' },
-  // Grupo B
-  { matchId: 'm3', group: 'B', homeTeam: 'Argentina', awayTeam: 'Francia', date: Date.parse('2026-06-13T15:00:00Z'), status: 'pending' },
-  { matchId: 'm4', group: 'B', homeTeam: 'Marruecos', awayTeam: 'Japón', date: Date.parse('2026-06-13T19:00:00Z'), status: 'pending' },
-  // Grupo C
-  { matchId: 'm5', group: 'C', homeTeam: 'Brasil', awayTeam: 'España', date: Date.parse('2026-06-14T16:00:00Z'), status: 'pending' },
-  { matchId: 'm6', group: 'C', homeTeam: 'Inglaterra', awayTeam: 'Senegal', date: Date.parse('2026-06-14T20:00:00Z'), status: 'pending' },
-  // Grupo D
-  { matchId: 'm7', group: 'D', homeTeam: 'Uruguay', awayTeam: 'Alemania', date: Date.parse('2026-06-15T15:00:00Z'), status: 'pending' },
-  { matchId: 'm8', group: 'D', homeTeam: 'Portugal', awayTeam: 'Corea del Sur', date: Date.parse('2026-06-15T19:00:00Z'), status: 'pending' },
-  // Grupo E
-  { matchId: 'm9', group: 'E', homeTeam: 'Bélgica', awayTeam: 'Colombia', date: Date.parse('2026-06-16T15:00:00Z'), status: 'pending' },
-  { matchId: 'm10', group: 'E', homeTeam: 'Croacia', awayTeam: 'Nigeria', date: Date.parse('2026-06-16T19:00:00Z'), status: 'pending' },
-  // Grupo F
-  { matchId: 'm11', group: 'F', homeTeam: 'Países Bajos', awayTeam: 'Chile', date: Date.parse('2026-06-17T15:00:00Z'), status: 'pending' },
-  { matchId: 'm12', group: 'F', homeTeam: 'Dinamarca', awayTeam: 'Egipto', date: Date.parse('2026-06-17T19:00:00Z'), status: 'pending' },
-  // Grupo G
-  { matchId: 'm13', group: 'G', homeTeam: 'Suiza', awayTeam: 'Arabia Saudita', date: Date.parse('2026-06-18T15:00:00Z'), status: 'pending' },
-  { matchId: 'm14', group: 'G', homeTeam: 'Estados Unidos', awayTeam: 'Italia', date: Date.parse('2026-06-18T19:00:00Z'), status: 'pending' },
-  // Grupo H
-  { matchId: 'm15', group: 'H', homeTeam: 'Argentina', awayTeam: 'Japón', date: Date.parse('2026-06-19T15:00:00Z'), status: 'pending' },
-  { matchId: 'm16', group: 'H', homeTeam: 'Brasil', awayTeam: 'Inglaterra', date: Date.parse('2026-06-19T19:00:00Z'), status: 'pending' },
-  // Grupo I
-  { matchId: 'm17', group: 'I', homeTeam: 'Uruguay', awayTeam: 'Portugal', date: Date.parse('2026-06-20T15:00:00Z'), status: 'pending' },
-  { matchId: 'm18', group: 'I', homeTeam: 'Francia', awayTeam: 'Marruecos', date: Date.parse('2026-06-20T19:00:00Z'), status: 'pending' },
-  // Grupo J
-  { matchId: 'm19', group: 'J', homeTeam: 'España', awayTeam: 'Senegal', date: Date.parse('2026-06-21T15:00:00Z'), status: 'pending' },
-  { matchId: 'm20', group: 'J', homeTeam: 'Alemania', awayTeam: 'Corea del Sur', date: Date.parse('2026-06-21T19:00:00Z'), status: 'pending' },
-  // Grupo K
-  { matchId: 'm21', group: 'K', homeTeam: 'Canadá', awayTeam: 'México', date: Date.parse('2026-06-22T15:00:00Z'), status: 'pending' },
-  { matchId: 'm22', group: 'K', homeTeam: 'Bélgica', awayTeam: 'Croacia', date: Date.parse('2026-06-22T19:00:00Z'), status: 'pending' },
-  // Grupo L
-  { matchId: 'm23', group: 'L', homeTeam: 'Países Bajos', awayTeam: 'Dinamarca', date: Date.parse('2026-06-23T15:00:00Z'), status: 'pending' },
-  { matchId: 'm24', group: 'L', homeTeam: 'Colombia', awayTeam: 'Chile', date: Date.parse('2026-06-23T19:00:00Z'), status: 'pending' }
-];
+const mappedGroups: Match[] = (partidosRaw as any[]).map((item, idx) => {
+  let cleanFecha = item.fecha;
+  if (cleanFecha.includes('2206')) {
+    cleanFecha = cleanFecha.replace('2206', '2026');
+  }
+  const [day, month, year] = cleanFecha.split('-').map(Number);
+  const [hour, minute] = item.hora.split(':').map(Number);
+  const dateTimestamp = Date.UTC(year, month - 1, day, hour, minute);
+
+  return {
+    matchId: `m_${idx + 1}`,
+    group: item.grupo.replace(/^[Gg]rupo\s+/, ''),
+    homeTeam: item.equipo_1,
+    awayTeam: item.equipo_2,
+    date: dateTimestamp,
+    status: 'pending',
+    stadium: item.estadio,
+    city: item.ciudad,
+    phase: 'Fase de grupos'
+  };
+});
+
+const mappedKnockout: Match[] = (otherFaseRaw as any[]).map((item, idx) => {
+  let cleanFecha = item.fecha;
+  if (cleanFecha.includes('2206')) {
+    cleanFecha = cleanFecha.replace('2206', '2026');
+  }
+  const [day, month, year] = cleanFecha.split('-').map(Number);
+  const [hour, minute] = item.hora.split(':').map(Number);
+  const dateTimestamp = Date.UTC(year, month - 1, day, hour, minute);
+
+  const matchNum = 73 + idx;
+
+  return {
+    matchId: `m_${matchNum}`,
+    group: `Llave ${matchNum}`,
+    homeTeam: item.equipo_1,
+    awayTeam: item.equipo_2,
+    date: dateTimestamp,
+    status: 'pending',
+    stadium: item.estadio,
+    city: item.ciudad,
+    phase: item.fase
+  };
+});
+
+// Lista oficial sembrada del fixture completo de la Copa Mundial 2026 (104 partidos)
+export const SEED_MATCHES: Match[] = [...mappedGroups, ...mappedKnockout];
+
 
 /**
  * Siembra los partidos del mundial en Firestore si la colección está vacía.
@@ -61,9 +73,9 @@ export const SEED_MATCHES: Match[] = [
 export const seedWorldCupMatches = async (): Promise<void> => {
   if (IS_MOCK_ENV) {
     const existing = localStorage.getItem('prode_matches');
-    if (!existing) {
+    if (!existing || JSON.parse(existing).length !== SEED_MATCHES.length) {
       localStorage.setItem('prode_matches', JSON.stringify(SEED_MATCHES));
-      console.log('🌱 Seeding: Partidos del mundial sembrados en LocalStorage (Mock).');
+      console.log(`🌱 Seeding: Mapeando ${SEED_MATCHES.length} partidos oficiales del fixture real en LocalStorage (Mock).`);
     }
     return;
   }
@@ -122,10 +134,29 @@ export const updateMatchResultInDB = async (
     const matchesJson = localStorage.getItem('prode_matches') || '[]';
     const matches: Match[] = JSON.parse(matchesJson);
     const matchIndex = matches.findIndex(m => m.matchId === matchId);
+    let winnerTeam = '';
+    let loserTeam = '';
+
     if (matchIndex !== -1) {
       matches[matchIndex].status = 'played';
       matches[matchIndex].homeScore = homeScore;
       matches[matchIndex].awayScore = awayScore;
+
+      // Algoritmo de avance automático en llaves eliminatorias
+      const matchNum = matchId.split('_')[1];
+      const winnerPlaceholder = `W${matchNum}`;
+      const loserPlaceholder = `RU${matchNum}`;
+      winnerTeam = homeScore >= awayScore ? matches[matchIndex].homeTeam : matches[matchIndex].awayTeam;
+      loserTeam = homeScore >= awayScore ? matches[matchIndex].awayTeam : matches[matchIndex].homeTeam;
+
+      // Reemplazar marcadores en futuros partidos del fixture
+      matches.forEach((m) => {
+        if (m.homeTeam === winnerPlaceholder) m.homeTeam = winnerTeam;
+        if (m.awayTeam === winnerPlaceholder) m.awayTeam = winnerTeam;
+        if (m.homeTeam === loserPlaceholder) m.homeTeam = loserTeam;
+        if (m.awayTeam === loserPlaceholder) m.awayTeam = loserTeam;
+      });
+
       localStorage.setItem('prode_matches', JSON.stringify(matches));
     }
 
@@ -167,14 +198,14 @@ export const updateMatchResultInDB = async (
     });
 
     localStorage.setItem('prode_users', JSON.stringify(users));
-    console.log('🔄 Recalculation: Resultados y puntuaciones actualizados en LocalStorage (Mock).');
+    console.log('🔄 Recalculation & Bracket Advance: Resultados, avances y puntuaciones actualizados en LocalStorage (Mock).');
     return;
   }
 
   try {
     const batch = writeBatch(db);
 
-    // 1. Actualizar el partido
+    // 1. Actualizar el partido actual
     const matchDocRef = doc(db, 'matches', matchId);
     batch.update(matchDocRef, {
       status: 'played',
@@ -182,7 +213,45 @@ export const updateMatchResultInDB = async (
       awayScore
     });
 
-    // 2. Obtener todas las predicciones asociadas a este partido
+    // 2. Mapear el ganador y perdedor para avanzar de llave en Firestore
+    const matchNum = matchId.split('_')[1];
+    const winnerPlaceholder = `W${matchNum}`;
+    const loserPlaceholder = `RU${matchNum}`;
+    
+    const currentMatchDoc = await getDoc(matchDocRef);
+    if (currentMatchDoc.exists()) {
+      const currentMatch = currentMatchDoc.data() as Match;
+      const winnerTeam = homeScore >= awayScore ? currentMatch.homeTeam : currentMatch.awayTeam;
+      const loserTeam = homeScore >= awayScore ? currentMatch.awayTeam : currentMatch.homeTeam;
+
+      // Buscar partidos futuros que contengan WXX o RUXX
+      const futureMatchesHomeWinnerQuery = query(collection(db, 'matches'), where('homeTeam', '==', winnerPlaceholder));
+      const futureMatchesAwayWinnerQuery = query(collection(db, 'matches'), where('awayTeam', '==', winnerPlaceholder));
+      const futureMatchesHomeLoserQuery = query(collection(db, 'matches'), where('homeTeam', '==', loserPlaceholder));
+      const futureMatchesAwayLoserQuery = query(collection(db, 'matches'), where('awayTeam', '==', loserPlaceholder));
+
+      const [snapHW, snapAW, snapHL, snapAL] = await Promise.all([
+        getDocs(futureMatchesHomeWinnerQuery),
+        getDocs(futureMatchesAwayWinnerQuery),
+        getDocs(futureMatchesHomeLoserQuery),
+        getDocs(futureMatchesAwayLoserQuery)
+      ]);
+
+      snapHW.forEach((docSnap) => {
+        batch.update(doc(db, 'matches', docSnap.id), { homeTeam: winnerTeam });
+      });
+      snapAW.forEach((docSnap) => {
+        batch.update(doc(db, 'matches', docSnap.id), { awayTeam: winnerTeam });
+      });
+      snapHL.forEach((docSnap) => {
+        batch.update(doc(db, 'matches', docSnap.id), { homeTeam: loserTeam });
+      });
+      snapAL.forEach((docSnap) => {
+        batch.update(doc(db, 'matches', docSnap.id), { awayTeam: loserTeam });
+      });
+    }
+
+    // 3. Obtener todas las predicciones asociadas a este partido
     const predsQuery = query(collection(db, 'predictions'), where('matchId', '==', matchId));
     const predsSnapshot = await getDocs(predsQuery);
 
@@ -201,10 +270,10 @@ export const updateMatchResultInDB = async (
       affectedUsers.add(pred.userId);
     });
 
-    // Ejecutar el primer batch (partidos y predicciones actualizadas)
+    // Ejecutar el primer batch (partidos, llaves y predicciones actualizadas)
     await batch.commit();
 
-    // 3. Recalcular el perfil de cada usuario afectado
+    // 4. Recalcular el perfil de cada usuario afectado
     const secondBatch = writeBatch(db);
 
     for (const userId of affectedUsers) {
@@ -233,9 +302,9 @@ export const updateMatchResultInDB = async (
     }
 
     await secondBatch.commit();
-    console.log('🔄 Recalculation: Puntajes y estadísticas recalculados con éxito para todos los participantes.');
+    console.log('🔄 Recalculation & Bracket Advance: Puntajes, estadísticas y brackets recalculados con éxito.');
   } catch (err) {
-    console.error('Error actualizando resultados y recalculando puntos:', err);
+    console.error('Error actualizando resultados y recalculando puntos/brackets:', err);
     throw err;
   }
 };
@@ -249,6 +318,9 @@ export const addNewMatchToDB = async (matchData: {
   homeTeam: string;
   awayTeam: string;
   date: number;
+  stadium: string;
+  city: string;
+  phase?: string;
 }): Promise<void> => {
   const matchId = `m_${matchData.date}_${Math.floor(Math.random() * 1000)}`;
   const newMatch: Match = {
@@ -257,7 +329,10 @@ export const addNewMatchToDB = async (matchData: {
     homeTeam: matchData.homeTeam,
     awayTeam: matchData.awayTeam,
     date: matchData.date,
-    status: 'pending'
+    status: 'pending',
+    stadium: matchData.stadium,
+    city: matchData.city,
+    phase: matchData.phase || 'Fase de grupos'
   };
 
   if (IS_MOCK_ENV) {
@@ -567,4 +642,182 @@ export const randomizeGhostPredictions = async (ghostId: string): Promise<void> 
     throw err;
   }
 };
+
+/**
+ * Actualiza los metadatos de un partido (equipos, grupo, fecha) en Firestore o LocalStorage (Mock).
+ */
+export const updateMatchMetadataInDB = async (
+  matchId: string,
+  data: {
+    group: string;
+    homeTeam: string;
+    awayTeam: string;
+    date: number;
+    stadium: string;
+    city: string;
+    phase?: string;
+  }
+): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    const matchesJson = localStorage.getItem('prode_matches') || '[]';
+    const matches: Match[] = JSON.parse(matchesJson);
+    const matchIndex = matches.findIndex(m => m.matchId === matchId);
+    if (matchIndex !== -1) {
+      matches[matchIndex].group = data.group;
+      matches[matchIndex].homeTeam = data.homeTeam;
+      matches[matchIndex].awayTeam = data.awayTeam;
+      matches[matchIndex].date = data.date;
+      matches[matchIndex].stadium = data.stadium;
+      matches[matchIndex].city = data.city;
+      if (data.phase) {
+        matches[matchIndex].phase = data.phase;
+      }
+      localStorage.setItem('prode_matches', JSON.stringify(matches));
+      console.log('🌱 Mock: Metadatos de partido actualizados con éxito.');
+    }
+    return;
+  }
+
+  try {
+    const matchDocRef = doc(db, 'matches', matchId);
+    const updateData: any = {
+      group: data.group,
+      homeTeam: data.homeTeam,
+      awayTeam: data.awayTeam,
+      date: data.date,
+      stadium: data.stadium,
+      city: data.city
+    };
+    if (data.phase) {
+      updateData.phase = data.phase;
+    }
+    await updateDoc(matchDocRef, updateData);
+    console.log('🌱 DB: Metadatos de partido actualizados en Firestore.');
+  } catch (err) {
+    console.error('Error al actualizar metadatos del partido:', err);
+    throw err;
+  }
+};
+
+
+/**
+ * Fuerza el sembrado completo del fixture de 104 partidos reemplazando los existentes.
+ */
+export const forceReseedMatchesInDB = async (): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    localStorage.setItem('prode_matches', JSON.stringify(SEED_MATCHES));
+    console.log('🌱 Mock: Fixture re-sembrado exitosamente (104 partidos) en LocalStorage.');
+    return;
+  }
+
+  try {
+    // 1. Obtener todos los partidos actuales
+    const matchesColl = collection(db, 'matches');
+    const snapshot = await getDocs(matchesColl);
+
+    // 2. Borrar partidos existentes en batches de 400
+    let batch = writeBatch(db);
+    let count = 0;
+    
+    for (const matchDoc of snapshot.docs) {
+      batch.delete(doc(db, 'matches', matchDoc.id));
+      count++;
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+    if (count > 0) {
+      await batch.commit();
+    }
+
+    // 3. Sembrar los nuevos 104 partidos oficiales
+    batch = writeBatch(db);
+    SEED_MATCHES.forEach((match) => {
+      const matchDocRef = doc(db, 'matches', match.matchId);
+      batch.set(matchDocRef, match);
+    });
+    await batch.commit();
+    console.log('🌱 DB: Fixture de 104 partidos re-sembrado y reemplazado con éxito en Cloud Firestore.');
+  } catch (err) {
+    console.error('Error al forzar re-sembrado de partidos:', err);
+    throw err;
+  }
+};
+
+/**
+ * Borra todas las predicciones registradas y reinicia los puntajes/estados de los usuarios.
+ */
+export const deleteAllPredictionsAndResetUsers = async (): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    // 1. Borrar predicciones
+    localStorage.setItem('prode_predictions', JSON.stringify([]));
+
+    // 2. Reiniciar usuarios
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+    users.forEach((user) => {
+      user.completedProde = false;
+      user.points = 0;
+      user.exactMatchesCount = 0;
+      user.outcomeMatchesCount = 0;
+    });
+    localStorage.setItem('prode_users', JSON.stringify(users));
+    console.log('🌱 Mock: Predicciones eliminadas y puntajes reseteados en LocalStorage.');
+    return;
+  }
+
+  try {
+    // 1. Obtener todas las predicciones
+    const predsColl = collection(db, 'predictions');
+    const snapshot = await getDocs(predsColl);
+
+    // 2. Borrar en batches de 400
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const predDoc of snapshot.docs) {
+      batch.delete(doc(db, 'predictions', predDoc.id));
+      count++;
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+    if (count > 0) {
+      await batch.commit();
+    }
+
+    // 3. Obtener todos los usuarios y reiniciar perfiles
+    const usersColl = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersColl);
+
+    batch = writeBatch(db);
+    count = 0;
+    for (const userDoc of usersSnapshot.docs) {
+      batch.update(doc(db, 'users', userDoc.id), {
+        completedProde: false,
+        points: 0,
+        exactMatchesCount: 0,
+        outcomeMatchesCount: 0
+      });
+      count++;
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+    if (count > 0) {
+      await batch.commit();
+    }
+
+    console.log('🌱 DB: Todas las predicciones fueron borradas y perfiles reseteados en Cloud Firestore.');
+  } catch (err) {
+    console.error('Error borrando predicciones y reseteando usuarios:', err);
+    throw err;
+  }
+};
+
 

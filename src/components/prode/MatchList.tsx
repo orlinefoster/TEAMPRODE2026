@@ -138,7 +138,7 @@ export const MatchList: React.FC<MatchListProps> = ({
                     display: 'inline-block',
                     backgroundColor: 'var(--bg-overlay)',
                     border: '1px solid var(--border-light)',
-                    color: 'var(--accent-gold)',
+                    color: match.phase && match.phase !== 'Fase de grupos' ? 'var(--accent-blue)' : 'var(--accent-gold)',
                     fontWeight: 600,
                     fontSize: '0.75rem',
                     padding: '2px 8px',
@@ -147,11 +147,16 @@ export const MatchList: React.FC<MatchListProps> = ({
                     marginBottom: '6px',
                     textTransform: 'uppercase'
                   }}>
-                    Grupo {match.group}
+                    {match.phase && match.phase !== 'Fase de grupos' ? match.phase : `Grupo ${match.group}`}
                   </span>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                     {matchDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} • {matchDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} HS
                   </span>
+                  {match.stadium && match.city && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      📍 {match.stadium}, {match.city}
+                    </span>
+                  )}
                 </div>
 
                 {/* Marcador Central / Rivales */}

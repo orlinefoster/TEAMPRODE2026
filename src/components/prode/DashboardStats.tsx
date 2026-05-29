@@ -96,8 +96,8 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({ users }) => {
           <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '20px', textAlign: 'center' }}>
             Distribución de Aciertos
           </h3>
-          <div style={{ flex: 1, minHeight: '250px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: '100%', height: '250px' }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
                   data={stats.pieData}
@@ -128,8 +128,8 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({ users }) => {
           <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '20px', textAlign: 'center' }}>
             Top 5 Mejores Pronosticadores
           </h3>
-          <div style={{ flex: 1, minHeight: '250px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: '100%', height: '250px' }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={stats.topUsers} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <XAxis dataKey="name" stroke="var(--text-muted)" tick={{ fill: 'var(--text-muted)' }} />
                 <YAxis stroke="var(--text-muted)" tick={{ fill: 'var(--text-muted)' }} />

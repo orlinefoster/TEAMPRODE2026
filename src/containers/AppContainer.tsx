@@ -4,6 +4,7 @@ import { LoginForm } from '../components/auth/LoginForm';
 import { RegisterForm } from '../components/auth/RegisterForm';
 import { ForgotPasswordForm } from '../components/auth/ForgotPasswordForm';
 import { Navbar } from '../components/common/Navbar';
+import { LoadingModal } from '../components/common/LoadingModal';
 import { WhitelistManager } from '../components/admin/WhitelistManager';
 import { MatchList } from '../components/prode/MatchList';
 import { MatchScoreModal } from '../components/admin/MatchScoreModal';
@@ -15,6 +16,7 @@ import { ParticipantsTable } from '../components/prode/ParticipantsTable';
 import { Leaderboard } from '../components/prode/Leaderboard';
 import { GhostCreator } from '../components/admin/GhostCreator';
 import { UserProfileEditor } from '../components/profile/UserProfileEditor';
+import { MatchResultsManager } from '../components/admin/MatchResultsManager';
 import type { WhitelistEntry, Match, Prediction, UserProfile } from '../types';
 import { 
   collection, 
@@ -33,17 +35,20 @@ import {
   getMatchesFromDB, 
   updateMatchResultInDB, 
   addNewMatchToDB,
+  updateMatchMetadataInDB,
   getUserPredictions,
   saveUserPrediction,
   getAllParticipantsFromDB,
   createGhostParticipant,
-  randomizeGhostPredictions
+  randomizeGhostPredictions,
+  forceReseedMatchesInDB,
+  deleteAllPredictionsAndResetUsers
 } from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
 type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile';
 type ProdeSubTab = 'fill' | 'calendar' | 'scenario' | 'stats' | 'participants';
-type AdminSubTab = 'whitelist' | 'scheduler' | 'ghosts';
+type AdminSubTab = 'whitelist' | 'scheduler' | 'results' | 'ghosts' | 'system';
 
 // Mock inicial de correos permitidos para desarrollo local
 const INITIAL_MOCK_WHITELIST: WhitelistEntry[] = [
@@ -92,6 +97,11 @@ export const AppContainer: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
+
+  // Estados para Mantenimiento de Sistema (Admin)
+  const [systemLoading, setSystemLoading] = useState(false);
+  const [systemError, setSystemError] = useState<string | null>(null);
+  const [systemSuccess, setSystemSuccess] = useState<string | null>(null);
 
   // Estados específicos para las Predicciones (Prode)
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -308,6 +318,9 @@ export const AppContainer: React.FC = () => {
     homeTeam: string;
     awayTeam: string;
     date: number;
+    stadium: string;
+    city: string;
+    phase?: string;
   }) => {
     setAdminSchedulingLoading(true);
     setAdminSchedulingError(null);
@@ -324,6 +337,82 @@ export const AppContainer: React.FC = () => {
       setAdminSchedulingError('No se pudo agendar el partido. Comprobá las reglas de Firestore.');
     } finally {
       setAdminSchedulingLoading(false);
+    }
+  };
+
+  // Acción Admin: Modificar metadatos de un partido
+  const handleUpdateMatchMetadata = async (
+    matchId: string,
+    matchData: {
+      group: string;
+      homeTeam: string;
+      awayTeam: string;
+      date: number;
+      stadium: string;
+      city: string;
+      phase?: string;
+    }
+  ) => {
+    setAdminSchedulingLoading(true);
+    setAdminSchedulingError(null);
+    setAdminSchedulingSuccess(null);
+    try {
+      await updateMatchMetadataInDB(matchId, matchData);
+      setAdminSchedulingSuccess(`¡Partido actualizado con éxito!`);
+      
+      // Recargar partidos de la DB
+      const updatedMatches = await getMatchesFromDB();
+      setMatches(updatedMatches);
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error('Error al actualizar metadatos de partido:', err);
+      setAdminSchedulingError('No se pudieron guardar los cambios del partido.');
+      throw err;
+    } finally {
+      setAdminSchedulingLoading(false);
+    }
+  };
+
+  // Acción Admin: Forzar re-sembrado completo
+  const handleForceReseedMatches = async () => {
+    if (!window.confirm('¿Estás seguro de que querés reemplazar TODOS los partidos de la base de datos por el fixture limpio oficial de 104 partidos? Esto pisará los resultados actuales cargados.')) {
+      return;
+    }
+    setSystemLoading(true);
+    setSystemError(null);
+    setSystemSuccess(null);
+    try {
+      await forceReseedMatchesInDB();
+      setSystemSuccess('¡Fixture oficial de 104 partidos re-sembrado y reemplazado con éxito!');
+      // Recargar partidos
+      const loaded = await getMatchesFromDB();
+      setMatches(loaded);
+    } catch (err) {
+      console.error(err);
+      setSystemError('No se pudo re-sembrar el fixture. Revisa las reglas de Firestore.');
+    } finally {
+      setSystemLoading(false);
+    }
+  };
+
+  // Acción Admin: Borrar predicciones y resetear perfiles
+  const handleDeleteAllPredictions = async () => {
+    if (!window.confirm('🚨 ADVERTENCIA CRÍTICA: ¿Estás seguro de que querés BORRAR TODAS las predicciones de todos los usuarios y resetear sus puntajes a 0? Esta acción es irreversible.')) {
+      return;
+    }
+    setSystemLoading(true);
+    setSystemError(null);
+    setSystemSuccess(null);
+    try {
+      await deleteAllPredictionsAndResetUsers();
+      setSystemSuccess('¡Todas las predicciones fueron borradas y los puntajes de los usuarios reiniciados a 0!');
+      // Recargar predicciones
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error(err);
+      setSystemError('No se pudieron borrar las predicciones de la base de datos.');
+    } finally {
+      setSystemLoading(false);
     }
   };
 
@@ -439,23 +528,7 @@ export const AppContainer: React.FC = () => {
 
   // 1. Pantalla de Carga Shimmer Premium
   if (loading) {
-    return (
-      <div className="flex-center" style={{ minHeight: '100vh', flexDirection: 'column', gap: '20px' }}>
-        <div style={{ fontSize: '3rem', animation: 'pulse 1.5s infinite ease-in-out' }}>🏆</div>
-        <div style={{ width: '200px', height: '4px', backgroundColor: 'var(--bg-overlay)', borderRadius: '2px', overflow: 'hidden', position: 'relative' }}>
-          <div className="skeleton" style={{ width: '100%', height: '100%' }}></div>
-        </div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-          Cargando tu Estadio...
-        </p>
-        <style>{`
-          @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 1; }
-          }
-        `}</style>
-      </div>
-    );
+    return <LoadingModal isOpen={loading} message="Cargando tu Estadio..." />;
   }
 
   // 2. Ruteador para Invitados (No Autenticados)
@@ -681,7 +754,7 @@ export const AppContainer: React.FC = () => {
         {memberView === 'whitelist' && isAdmin && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Sub-Navegación Admin */}
-            <div className="glass-panel" style={{ padding: '10px 20px', display: 'flex', gap: '15px' }}>
+            <div className="glass-panel" style={{ padding: '10px 20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setAdminSubTab('whitelist')}
                 className="btn"
@@ -697,6 +770,38 @@ export const AppContainer: React.FC = () => {
                 }}
               >
                 Gestionar Whitelist
+              </button>
+              <button
+                onClick={() => setAdminSubTab('scheduler')}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.9rem',
+                  borderRadius: '6px',
+                  backgroundColor: adminSubTab === 'scheduler' ? 'var(--border-light)' : 'transparent',
+                  color: adminSubTab === 'scheduler' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  border: '1px solid',
+                  borderColor: adminSubTab === 'scheduler' ? 'var(--border-active)' : 'transparent',
+                  fontWeight: 600
+                }}
+              >
+                Agendar Partidos
+              </button>
+              <button
+                onClick={() => setAdminSubTab('results')}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.9rem',
+                  borderRadius: '6px',
+                  backgroundColor: adminSubTab === 'results' ? 'var(--border-light)' : 'transparent',
+                  color: adminSubTab === 'results' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  border: '1px solid',
+                  borderColor: adminSubTab === 'results' ? 'var(--border-active)' : 'transparent',
+                  fontWeight: 600
+                }}
+              >
+                ⚽ Cargar Resultados
               </button>
               <button
                 onClick={() => setAdminSubTab('ghosts')}
@@ -715,20 +820,20 @@ export const AppContainer: React.FC = () => {
                 Participantes Fantasmas
               </button>
               <button
-                onClick={() => setAdminSubTab('scheduler')}
+                onClick={() => setAdminSubTab('system')}
                 className="btn"
                 style={{
                   padding: '8px 16px',
                   fontSize: '0.9rem',
                   borderRadius: '6px',
-                  backgroundColor: adminSubTab === 'scheduler' ? 'var(--border-light)' : 'transparent',
-                  color: adminSubTab === 'scheduler' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  backgroundColor: adminSubTab === 'system' ? 'var(--border-light)' : 'transparent',
+                  color: adminSubTab === 'system' ? 'var(--accent-gold)' : 'var(--text-muted)',
                   border: '1px solid',
-                  borderColor: adminSubTab === 'scheduler' ? 'var(--border-active)' : 'transparent',
+                  borderColor: adminSubTab === 'system' ? 'var(--border-active)' : 'transparent',
                   fontWeight: 600
                 }}
               >
-                Agendar Partidos
+                ⚙️ Mantenimiento
               </button>
             </div>
 
@@ -753,11 +858,108 @@ export const AppContainer: React.FC = () => {
             )}
             {adminSubTab === 'scheduler' && (
               <MatchScheduler 
+                matches={matches}
                 onScheduleMatch={handleScheduleMatch}
+                onUpdateMatchMetadata={handleUpdateMatchMetadata}
                 loading={adminSchedulingLoading}
                 error={adminSchedulingError}
                 successMessage={adminSchedulingSuccess}
               />
+            )}
+            {adminSubTab === 'results' && (
+              <MatchResultsManager 
+                matches={matches}
+                onSaveResult={handleSaveMatchResult}
+                loading={adminSavingResult}
+              />
+            )}
+            {adminSubTab === 'system' && (
+              <div className="glass-panel" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '10px' }}>
+                  ⚙️ Panel de Mantenimiento de Datos (Exclusivo Admin)
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '10px', lineHeight: 1.5 }}>
+                  Herramientas avanzadas para la gestión e inicialización del prode. Úsalas con extrema precaución ya que impactan directamente sobre todos los participantes reales.
+                </p>
+
+                {systemError && (
+                  <div style={{ 
+                    backgroundColor: 'RGBA(239, 68, 68, 0.1)', 
+                    border: '1px solid var(--accent-error)', 
+                    color: 'var(--text-main)', 
+                    padding: '12px 16px', 
+                    borderRadius: '8px', 
+                    fontSize: '0.9rem'
+                  }}>
+                    ⚠️ {systemError}
+                  </div>
+                )}
+
+                {systemSuccess && (
+                  <div style={{ 
+                    backgroundColor: 'RGBA(16, 185, 129, 0.1)', 
+                    border: '1px solid var(--accent-green)', 
+                    color: 'var(--text-main)', 
+                    padding: '12px 16px', 
+                    borderRadius: '8px', 
+                    fontSize: '0.9rem'
+                  }}>
+                    ✅ {systemSuccess}
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '25px', marginTop: '10px' }}>
+                  {/* Opción 1: Re-sembrar Fixture */}
+                  <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', backgroundColor: 'var(--bg-overlay)' }}>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                      🌱 Inicializar / Re-sembrar Fixture
+                    </h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.5, flex: 1 }}>
+                      Borra el calendario existente en la base de datos y vuelve a sembrar los **104 partidos limpios** del fixture oficial (Fase de grupos + Llaves eliminatorias).
+                    </p>
+                    <button
+                      onClick={handleForceReseedMatches}
+                      className="btn"
+                      style={{
+                        height: '45px',
+                        backgroundColor: 'RGBA(212, 163, 89, 0.1)',
+                        border: '1px solid var(--accent-gold)',
+                        color: 'var(--accent-gold)',
+                        fontWeight: 700,
+                        borderRadius: '6px'
+                      }}
+                      disabled={systemLoading}
+                    >
+                      {systemLoading ? 'Procesando...' : 'Re-sembrar 104 Partidos'}
+                    </button>
+                  </div>
+
+                  {/* Opción 2: Vaciar Predicciones */}
+                  <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', backgroundColor: 'var(--bg-overlay)' }}>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--accent-error)' }}>
+                      🗑️ Vaciar Todas las Predicciones
+                    </h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.5, flex: 1 }}>
+                      Elimina por completo todas las predicciones cargadas en el sistema por todos los usuarios. Restablece sus estados a pendiente (`completedProde = false`) y los puntajes y aciertos a `0`.
+                    </p>
+                    <button
+                      onClick={handleDeleteAllPredictions}
+                      className="btn btn-primary"
+                      style={{
+                        height: '45px',
+                        backgroundColor: 'var(--accent-error)',
+                        border: 'none',
+                        color: '#fff',
+                        fontWeight: 700,
+                        borderRadius: '6px'
+                      }}
+                      disabled={systemLoading}
+                    >
+                      {systemLoading ? 'Procesando...' : 'Borrar Predicciones de Usuarios'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
