@@ -34,6 +34,7 @@ import {
   seedWorldCupMatches, 
   getMatchesFromDB, 
   updateMatchResultInDB, 
+  deleteMatchResultInDB,
   addNewMatchToDB,
   updateMatchMetadataInDB,
   getUserPredictions,
@@ -306,6 +307,24 @@ export const AppContainer: React.FC = () => {
       await loadPredictionsAndParticipants();
     } catch (err) {
       console.error('Error guardando resultado de partido:', err);
+      throw err;
+    } finally {
+      setAdminSavingResult(false);
+    }
+  };
+
+  // Acción Admin: Eliminar / Resetear un resultado real
+  const handleDeleteMatchResult = async (matchId: string) => {
+    setAdminSavingResult(true);
+    try {
+      await deleteMatchResultInDB(matchId);
+      
+      // Recargar partidos y recálculos de la DB
+      const updatedMatches = await getMatchesFromDB();
+      setMatches(updatedMatches);
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error('Error eliminando resultado de partido:', err);
       throw err;
     } finally {
       setAdminSavingResult(false);
@@ -998,6 +1017,7 @@ export const AppContainer: React.FC = () => {
           match={selectedMatchToEdit}
           onClose={() => setSelectedMatchToEdit(null)}
           onSaveResult={handleSaveMatchResult}
+          onDeleteResult={handleDeleteMatchResult}
           loading={adminSavingResult}
         />
       )}

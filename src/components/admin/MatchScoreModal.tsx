@@ -5,6 +5,7 @@ interface MatchScoreModalProps {
   match: Match;
   onClose: () => void;
   onSaveResult: (matchId: string, homeScore: number, awayScore: number) => Promise<void>;
+  onDeleteResult?: (matchId: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -12,6 +13,7 @@ export const MatchScoreModal: React.FC<MatchScoreModalProps> = ({
   match,
   onClose,
   onSaveResult,
+  onDeleteResult,
   loading
 }) => {
   const [homeScore, setHomeScore] = useState<string>(
@@ -39,6 +41,20 @@ export const MatchScoreModal: React.FC<MatchScoreModalProps> = ({
       onClose();
     } catch (err) {
       setLocalError('No se pudo guardar el resultado. Reintentá.');
+    }
+  };
+
+  const handleDeleteClick = async () => {
+    if (!window.confirm('¿Estás seguro de que querés ELIMINAR el resultado real de este partido? Se restablecerá a pendiente y se recalcularán todos los puntajes de los usuarios.')) {
+      return;
+    }
+    try {
+      if (onDeleteResult) {
+        await onDeleteResult(match.matchId);
+        onClose();
+      }
+    } catch (err) {
+      setLocalError('No se pudo eliminar el resultado. Reintentá.');
     }
   };
 
@@ -180,6 +196,28 @@ export const MatchScoreModal: React.FC<MatchScoreModalProps> = ({
               {loading ? 'Guardando...' : 'Confirmar Marcador'}
             </button>
           </div>
+
+          {match.status === 'played' && onDeleteResult && (
+            <button
+              type="button"
+              className="btn"
+              style={{
+                width: '100%',
+                backgroundColor: 'RGBA(239, 68, 68, 0.1)',
+                border: '1px solid var(--accent-error)',
+                color: 'var(--accent-error)',
+                fontWeight: 700,
+                borderRadius: '6px',
+                height: '42px',
+                marginTop: '10px',
+                transition: 'all 0.3s ease'
+              }}
+              onClick={handleDeleteClick}
+              disabled={loading}
+            >
+              {loading ? 'Eliminando...' : '🗑️ Eliminar Resultado (Volver a Pendiente)'}
+            </button>
+          )}
         </form>
       </div>
 

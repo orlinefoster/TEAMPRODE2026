@@ -8,7 +8,8 @@ import {
   setDoc,
   getDoc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  deleteField
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from './firebase';
 import type { Match, Prediction, UserProfile } from '../types';
@@ -305,6 +306,131 @@ export const updateMatchResultInDB = async (
     console.log('🔄 Recalculation & Bracket Advance: Puntajes, estadísticas y brackets recalculados con éxito.');
   } catch (err) {
     console.error('Error actualizando resultados y recalculando puntos/brackets:', err);
+    throw err;
+  }
+};
+
+/**
+ * Elimina (resetea) el resultado real de un partido, lo vuelve a pending y recalcula las predicciones de los usuarios.
+ * Soporta entorno Mock con LocalStorage y Cloud Firestore.
+ */
+export const deleteMatchResultInDB = async (matchId: string): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    // 1. Actualizar partido en LocalStorage (mock)
+    const matchesJson = localStorage.getItem('prode_matches') || '[]';
+    const matches: Match[] = JSON.parse(matchesJson);
+    const matchIndex = matches.findIndex(m => m.matchId === matchId);
+
+    if (matchIndex !== -1) {
+      matches[matchIndex].status = 'pending';
+      delete matches[matchIndex].homeScore;
+      delete matches[matchIndex].awayScore;
+      localStorage.setItem('prode_matches', JSON.stringify(matches));
+    }
+
+    // 2. Cargar predicciones mock y restablecerlas para este partido
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    const predictions: Prediction[] = JSON.parse(predsJson);
+
+    predictions.forEach((pred) => {
+      if (pred.matchId === matchId) {
+        delete pred.pointsEarned;
+        pred.calculated = false;
+      }
+    });
+    localStorage.setItem('prode_predictions', JSON.stringify(predictions));
+
+    // 3. Recalcular perfiles de usuarios mock
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+
+    users.forEach((user) => {
+      const userPreds = predictions.filter(p => p.userId === user.uid);
+      let totalPoints = 0;
+      let exactCount = 0;
+      let outcomeCount = 0;
+
+      userPreds.forEach((pred) => {
+        if (pred.calculated && pred.pointsEarned !== undefined) {
+          totalPoints += pred.pointsEarned;
+          if (pred.pointsEarned === 3) exactCount++;
+          if (pred.pointsEarned === 1) outcomeCount++;
+        }
+      });
+
+      user.points = totalPoints;
+      user.exactMatchesCount = exactCount;
+      user.outcomeMatchesCount = outcomeCount;
+    });
+
+    localStorage.setItem('prode_users', JSON.stringify(users));
+    console.log('🔄 Recalculation: Resultado del partido eliminado con éxito en LocalStorage (Mock).');
+    return;
+  }
+
+  try {
+    const batch = writeBatch(db);
+
+    // 1. Actualizar el partido actual (restablecer a pending y remover marcadores)
+    const matchDocRef = doc(db, 'matches', matchId);
+    batch.update(matchDocRef, {
+      status: 'pending',
+      homeScore: deleteField(),
+      awayScore: deleteField()
+    });
+
+    // 2. Obtener todas las predicciones asociadas a este partido
+    const predsQuery = query(collection(db, 'predictions'), where('matchId', '==', matchId));
+    const predsSnapshot = await getDocs(predsQuery);
+
+    const affectedUsers = new Set<string>();
+
+    predsSnapshot.forEach((predDocSnap) => {
+      const pred = predDocSnap.data() as Prediction;
+      const predDocRef = doc(db, 'predictions', predDocSnap.id);
+      batch.update(predDocRef, {
+        pointsEarned: deleteField(),
+        calculated: false
+      });
+
+      affectedUsers.add(pred.userId);
+    });
+
+    // Ejecutar el primer batch (partido y predicciones)
+    await batch.commit();
+
+    // 3. Recalcular el perfil de cada usuario afectado
+    const secondBatch = writeBatch(db);
+
+    for (const userId of affectedUsers) {
+      const userPredsQuery = query(collection(db, 'predictions'), where('userId', '==', userId));
+      const userPredsSnapshot = await getDocs(userPredsQuery);
+
+      let totalPoints = 0;
+      let exactCount = 0;
+      let outcomeCount = 0;
+
+      userPredsSnapshot.forEach((predDocSnap) => {
+        const pred = predDocSnap.data() as Prediction;
+        if (pred.calculated && pred.pointsEarned !== undefined) {
+          totalPoints += pred.pointsEarned;
+          if (pred.pointsEarned === 3) exactCount++;
+          if (pred.pointsEarned === 1) outcomeCount++;
+        }
+      });
+
+      const userDocRef = doc(db, 'users', userId);
+      secondBatch.update(userDocRef, {
+        points: totalPoints,
+        exactMatchesCount: exactCount,
+        outcomeMatchesCount: outcomeCount
+      });
+    }
+
+    await secondBatch.commit();
+    console.log('🔄 Recalculation: Resultado del partido eliminado con éxito en Firestore.');
+  } catch (err) {
+    console.error('Error al eliminar resultado de partido:', err);
     throw err;
   }
 };
