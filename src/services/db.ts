@@ -1054,4 +1054,185 @@ export const getCountryFlag = (countryName: string): string => {
   return flags[name] || '🏳️';
 };
 
+/**
+ * Aleatoriza las predicciones de TODOS los participantes fantasmas "SOLO PARA LA FASE DE GRUPOS".
+ * Soporta entorno Mock con LocalStorage y Cloud Firestore.
+ */
+export const randomizeAllGhostsGroupStagePredictions = async (): Promise<void> => {
+  const users = await getAllParticipantsFromDB();
+  const ghosts = users.filter(u => u.isGhost);
+  const matches = await getMatchesFromDB();
+  const groupStageMatches = matches.filter(m => m.phase === 'Fase de grupos');
+
+  if (IS_MOCK_ENV) {
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    let predictions: Prediction[] = JSON.parse(predsJson);
+
+    ghosts.forEach((ghost) => {
+      // Filtrar predicciones de fase de grupos previas para este fantasma
+      predictions = predictions.filter(p => !(p.userId === ghost.uid && groupStageMatches.some(m => m.matchId === p.matchId)));
+
+      groupStageMatches.forEach((match) => {
+        const predictionId = `${ghost.uid}_${match.matchId}`;
+        const homePrediction = Math.floor(Math.random() * 5); // 0 a 4 goles
+        const awayPrediction = Math.floor(Math.random() * 5);
+
+        predictions.push({
+          predictionId,
+          userId: ghost.uid,
+          matchId: match.matchId,
+          homePrediction,
+          awayPrediction,
+          calculated: false
+        });
+      });
+    });
+
+    localStorage.setItem('prode_predictions', JSON.stringify(predictions));
+
+    // Marcar completedProde como true para todos los fantasmas
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const allUsers: UserProfile[] = JSON.parse(usersJson);
+    allUsers.forEach((u) => {
+      if (u.isGhost) {
+        u.completedProde = true;
+      }
+    });
+    localStorage.setItem('prode_users', JSON.stringify(allUsers));
+    console.log('🎲 Scenario: Se aleatorizaron las predicciones de la Fase de grupos para TODOS los fantasmas en LocalStorage (Mock).');
+    return;
+  }
+
+  try {
+    // Para producción
+    let batch = writeBatch(db);
+    let count = 0;
+
+    for (const ghost of ghosts) {
+      for (const match of groupStageMatches) {
+        const predictionId = `${ghost.uid}_${match.matchId}`;
+        const homePrediction = Math.floor(Math.random() * 5);
+        const awayPrediction = Math.floor(Math.random() * 5);
+
+        const predDocRef = doc(db, 'predictions', predictionId);
+        batch.set(predDocRef, {
+          predictionId,
+          userId: ghost.uid,
+          matchId: match.matchId,
+          homePrediction,
+          awayPrediction,
+          calculated: false
+        });
+
+        count++;
+        if (count >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+
+      const userDocRef = doc(db, 'users', ghost.uid);
+      batch.update(userDocRef, { completedProde: true });
+      count++;
+
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+
+    if (count > 0) {
+      await batch.commit();
+    }
+    console.log('🎲 Scenario: Se aleatorizaron las predicciones de la Fase de grupos para TODOS los fantasmas en Firestore.');
+  } catch (err) {
+    console.error('Error al aleatorizar predicciones grupales de fantasmas:', err);
+    throw err;
+  }
+};
+
+/**
+ * Actualiza el nombre de un participante fantasma.
+ * Soporta entorno Mock con LocalStorage y Cloud Firestore.
+ */
+export const updateGhostNameInDB = async (ghostUid: string, newName: string): Promise<void> => {
+  const cleanName = newName.startsWith('👻 ') ? newName : `👻 ${newName}`;
+  
+  if (IS_MOCK_ENV) {
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+    const index = users.findIndex(u => u.uid === ghostUid);
+    if (index !== -1) {
+      users[index].displayName = cleanName;
+      localStorage.setItem('prode_users', JSON.stringify(users));
+      console.log(`👻 Mock: Nombre del fantasma actualizado a ${cleanName}`);
+    }
+    return;
+  }
+
+  try {
+    const docRef = doc(db, 'users', ghostUid);
+    await updateDoc(docRef, {
+      displayName: cleanName
+    });
+    console.log(`👻 DB: Nombre del fantasma actualizado a ${cleanName} en Firestore.`);
+  } catch (err) {
+    console.error('Error al actualizar nombre de fantasma:', err);
+    throw err;
+  }
+};
+
+/**
+ * Elimina un participante fantasma de la base de datos junto con todas sus predicciones.
+ * Soporta entorno Mock con LocalStorage y Cloud Firestore.
+ */
+export const deleteGhostFromDB = async (ghostUid: string): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    // 1. Remover usuario
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+    const updatedUsers = users.filter(u => u.uid !== ghostUid);
+    localStorage.setItem('prode_users', JSON.stringify(updatedUsers));
+
+    // 2. Remover predicciones del usuario
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    const predictions: Prediction[] = JSON.parse(predsJson);
+    const updatedPreds = predictions.filter(p => p.userId !== ghostUid);
+    localStorage.setItem('prode_predictions', JSON.stringify(updatedPreds));
+
+    console.log(`👻 Mock: Fantasma ${ghostUid} y sus predicciones eliminados.`);
+    return;
+  }
+
+  try {
+    // 1. Obtener todas las predicciones del fantasma
+    const predsQuery = query(collection(db, 'predictions'), where('userId', '==', ghostUid));
+    const snapshot = await getDocs(predsQuery);
+
+    let batch = writeBatch(db);
+    let count = 0;
+
+    snapshot.forEach((predDoc) => {
+      batch.delete(doc(db, 'predictions', predDoc.id));
+      count++;
+      if (count >= 400) {
+        batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    });
+
+    // 2. Borrar perfil de usuario
+    batch.delete(doc(db, 'users', ghostUid));
+    await batch.commit();
+
+    console.log(`👻 DB: Fantasma ${ghostUid} y sus predicciones eliminados de Firestore.`);
+  } catch (err) {
+    console.error('Error al eliminar fantasma:', err);
+    throw err;
+  }
+};
+
 

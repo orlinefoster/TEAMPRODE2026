@@ -43,7 +43,10 @@ import {
   createGhostParticipant,
   forceReseedMatchesInDB,
   deleteAllPredictionsAndResetUsers,
-  sealUserProdeInDB
+  sealUserProdeInDB,
+  randomizeAllGhostsGroupStagePredictions,
+  updateGhostNameInDB,
+  deleteGhostFromDB
 } from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
@@ -490,6 +493,56 @@ export const AppContainer: React.FC = () => {
     }
   };
 
+  // Acción Admin: Modificar nombre de fantasma
+  const handleUpdateGhostName = async (ghostUid: string, newName: string) => {
+    setAdminGhostLoading(true);
+    setAdminGhostError(null);
+    setAdminGhostSuccess(null);
+    try {
+      await updateGhostNameInDB(ghostUid, newName);
+      setAdminGhostSuccess('¡Nombre del participante fantasma actualizado!');
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error(err);
+      setAdminGhostError('No se pudo actualizar el nombre.');
+      throw err;
+    } finally {
+      setAdminGhostLoading(false);
+    }
+  };
+
+  // Acción Admin: Eliminar participante fantasma
+  const handleDeleteGhost = async (ghostUid: string) => {
+    setAdminGhostLoading(true);
+    setAdminGhostError(null);
+    setAdminGhostSuccess(null);
+    try {
+      await deleteGhostFromDB(ghostUid);
+      setAdminGhostSuccess('¡Participante fantasma eliminado con éxito!');
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error(err);
+      setAdminGhostError('No se pudo eliminar el participante fantasma.');
+      throw err;
+    } finally {
+      setAdminGhostLoading(false);
+    }
+  };
+
+  // Acción Admin: Aleatorizar predicciones de TODOS los fantasmas "SOLO FASE DE GRUPOS"
+  const handleRandomizeAllGhostsGroupStage = async () => {
+    setLoadingGhostRandomization(true);
+    try {
+      await randomizeAllGhostsGroupStagePredictions();
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error(err);
+      alert('Error al aleatorizar predicciones de fase de grupos de fantasmas.');
+    } finally {
+      setLoadingGhostRandomization(false);
+    }
+  };
+
   // Acción Usuario: Guardado automático de predicciones
   const handleSavePrediction = async (matchId: string, homePrediction: number, awayPrediction: number) => {
     if (!user) return;
@@ -881,7 +934,10 @@ export const AppContainer: React.FC = () => {
             )}
             {adminSubTab === 'ghosts' && (
               <GhostCreator 
+                ghosts={participants.filter(u => u.isGhost)}
                 onCreateGhost={handleCreateGhost}
+                onEditGhost={handleUpdateGhostName}
+                onDeleteGhost={handleDeleteGhost}
                 loading={adminGhostLoading}
                 error={adminGhostError}
                 successMessage={adminGhostSuccess}
@@ -909,6 +965,7 @@ export const AppContainer: React.FC = () => {
                 matches={matches}
                 allPredictions={allPredictions}
                 users={participants}
+                onRandomizeAllGhosts={handleRandomizeAllGhostsGroupStage}
               />
             )}
             {adminSubTab === 'system' && (

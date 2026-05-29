@@ -6,12 +6,14 @@ interface ScenarioSimulatorProps {
   matches: Match[];
   allPredictions: Prediction[];
   users: UserProfile[];
+  onRandomizeAllGhosts?: () => Promise<void>;
 }
 
 export const ScenarioSimulator: React.FC<ScenarioSimulatorProps> = ({
   matches,
   allPredictions,
-  users
+  users,
+  onRandomizeAllGhosts
 }) => {
   const [isActive, setIsActive] = useState(false);
   const [simulatedMatches, setSimulatedMatches] = useState<Match[]>([]);
@@ -161,13 +163,36 @@ export const ScenarioSimulator: React.FC<ScenarioSimulatorProps> = ({
                 El simulador está activo. Los cambios que digites acá son privados y no afectan a la base de datos de producción.
               </p>
             </div>
-            <button
-              onClick={handleRandomize}
-              className="btn btn-primary"
-              style={{ fontSize: '0.85rem', padding: '6px 14px', height: 'auto' }}
-            >
-              🎲 Aleatorizar Resultados Pendientes
-            </button>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleRandomize}
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', padding: '6px 14px', height: 'auto' }}
+              >
+                🎲 Aleatorizar Resultados Pendientes
+              </button>
+              {onRandomizeAllGhosts && (
+                <button
+                  onClick={async () => {
+                    if (window.confirm('¿Estás seguro de que querés aleatorizar las predicciones de la FASE DE GRUPOS para TODOS los fantasmas de forma irreversible?')) {
+                      await onRandomizeAllGhosts();
+                    }
+                  }}
+                  className="btn"
+                  style={{ 
+                    fontSize: '0.85rem', 
+                    padding: '6px 14px', 
+                    height: 'auto', 
+                    backgroundColor: 'RGBA(212, 163, 89, 0.1)', 
+                    border: '1px solid var(--accent-gold)',
+                    color: 'var(--accent-gold)',
+                    fontWeight: 700
+                  }}
+                >
+                  👻 Aleatorizar Fantasmas (Fase de Grupos)
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
