@@ -82,17 +82,23 @@ export const MatchScoreModal: React.FC<MatchScoreModalProps> = ({
 
         <div style={{ 
           textAlign: 'center', 
-          backgroundColor: 'var(--bg-overlay)', 
-          border: '1px solid var(--border-light)', 
-          padding: '8px 12px', 
-          borderRadius: '6px', 
+          backgroundColor: 'RGBA(212, 163, 89, 0.08)', 
+          border: '1px solid var(--accent-gold)', 
+          padding: '10px 14px', 
+          borderRadius: '8px', 
           fontSize: '0.8rem',
           color: 'var(--accent-gold)',
-          fontWeight: 600,
+          fontWeight: 700,
           marginBottom: '20px',
-          textTransform: 'uppercase'
+          textTransform: 'uppercase',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
         }}>
-          Grupo {match.group} • Fase de Grupos
+          <span>📢 REGISTRO DE RESULTADOS OFICIALES</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+            {match.phase === 'Fase de grupos' ? `Grupo ${match.group} • Fase de Grupos` : `${match.phase}`}
+          </span>
         </div>
 
         {localError && (

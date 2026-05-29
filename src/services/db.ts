@@ -387,17 +387,26 @@ export const saveUserPrediction = async (
 ): Promise<void> => {
   const predictionId = `${userId}_${matchId}`;
   
-  // 1. Validar si el partido ya empezó/jugó (bloqueado para predicciones)
+  // 1. Validar si el partido ya empezó/jugó (bloqueado para predicciones) o si es eliminatoria (solo fase de grupos permitida)
   let isMatchPlayed = false;
+  let isGroupStage = false;
+  
   if (IS_MOCK_ENV) {
     const matches = await getMatchesFromDB();
     const match = matches.find(m => m.matchId === matchId);
     isMatchPlayed = match?.status === 'played';
+    isGroupStage = match?.phase === 'Fase de grupos';
   } else {
     const matchDoc = await getDoc(doc(db, 'matches', matchId));
     if (matchDoc.exists()) {
-      isMatchPlayed = matchDoc.data().status === 'played';
+      const matchData = matchDoc.data();
+      isMatchPlayed = matchData.status === 'played';
+      isGroupStage = matchData.phase === 'Fase de grupos';
     }
+  }
+
+  if (!isGroupStage) {
+    throw new Error('El prode es exclusivo de la Fase de grupos. No se admiten pronósticos para eliminatorias.');
   }
 
   if (isMatchPlayed) {
