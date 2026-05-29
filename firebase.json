@@ -6,7 +6,8 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "public": "public",
+    "site": "teamprode2026",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",

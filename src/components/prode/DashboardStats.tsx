@@ -109,7 +109,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({ users }) => {
                   dataKey="value"
                   stroke="none"
                 >
-                  {stats.pieData.map((entry, index) => (
+                  {stats.pieData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
