@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import type { Match } from '../../types';
-import { getCountryFlag } from '../../services/db';
 
 interface MatchListProps {
   matches: Match[];
@@ -171,7 +170,6 @@ export const MatchList: React.FC<MatchListProps> = ({
                 }}>
                   <div style={{ flex: 1, textAlign: 'right', fontWeight: 600, fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
                     <span>{match.homeTeam}</span>
-                    <span style={{ fontSize: '1.2rem' }}>{getCountryFlag(match.homeTeam)}</span>
                   </div>
 
                   {/* Marcador Real */}
@@ -200,7 +198,6 @@ export const MatchList: React.FC<MatchListProps> = ({
                   </div>
 
                   <div style={{ flex: 1, textAlign: 'left', fontWeight: 600, fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px' }}>
-                    <span style={{ fontSize: '1.2rem' }}>{getCountryFlag(match.awayTeam)}</span>
                     <span>{match.awayTeam}</span>
                   </div>
                 </div>

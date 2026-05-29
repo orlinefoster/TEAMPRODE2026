@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import type { Match, Prediction, UserProfile } from '../../types';
-import { getCountryFlag } from '../../services/db';
 
 interface ProdeFormProps {
   matches: Match[];
@@ -208,7 +207,6 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
             }} title={match.homeTeam}>
               {match.homeTeam}
             </span>
-            <span style={{ fontSize: '1.2rem' }}>{getCountryFlag(match.homeTeam)}</span>
           </div>
 
           {/* Inputs de Predicción */}
@@ -257,7 +255,6 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
           </div>
 
           <div style={{ textAlign: 'left', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px' }}>
-            <span style={{ fontSize: '1.2rem' }}>{getCountryFlag(match.awayTeam)}</span>
             <span style={{ 
               overflow: 'hidden', 
               textOverflow: 'ellipsis', 
