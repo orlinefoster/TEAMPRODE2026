@@ -7,22 +7,26 @@ import type { UserProfile } from '../../types';
 
 interface DashboardStatsProps {
   users: UserProfile[];
+  includeGhosts?: boolean;
 }
 
-export const DashboardStats: React.FC<DashboardStatsProps> = ({ users }) => {
+export const DashboardStats: React.FC<DashboardStatsProps> = ({ users, includeGhosts = false }) => {
   const stats = useMemo(() => {
+    // Filtrar opcionalmente los participantes fantasmas
+    const filteredUsers = includeGhosts ? users : users.filter(u => !u.isGhost);
+
     let totalPoints = 0;
     let totalExact = 0;
     let totalOutcome = 0;
 
-    users.forEach(u => {
+    filteredUsers.forEach(u => {
       totalPoints += u.points || 0;
       totalExact += u.exactMatchesCount || 0;
       totalOutcome += u.outcomeMatchesCount || 0;
     });
 
-    const activeUsers = users.filter(u => !u.isGhost).length;
-    const avgPoints = activeUsers > 0 ? (totalPoints / activeUsers).toFixed(1) : '0.0';
+    const activeUsersCount = filteredUsers.length;
+    const avgPoints = activeUsersCount > 0 ? (totalPoints / activeUsersCount).toFixed(1) : '0.0';
 
     // Para el gráfico de Dona
     const pieData = [
@@ -31,17 +35,16 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({ users }) => {
     ];
 
     // Para el gráfico de barras (Top 5)
-    const topUsers = [...users]
-      .filter(u => !u.isGhost)
+    const topUsers = [...filteredUsers]
       .sort((a, b) => (b.points || 0) - (a.points || 0))
       .slice(0, 5)
       .map(u => ({
-        name: u.displayName.split(' ')[0], // Solo el primer nombre
+        name: u.displayName.replace(/^👻\s+/, '').split(' ')[0], // Remover emoji de fantasma y recortar a primer nombre
         Puntos: u.points || 0
       }));
 
-    return { totalPoints, totalExact, totalOutcome, activeUsers, avgPoints, pieData, topUsers };
-  }, [users]);
+    return { totalPoints, totalExact, totalOutcome, activeUsers: activeUsersCount, avgPoints, pieData, topUsers };
+  }, [users, includeGhosts]);
 
   const COLORS = ['#D4A359', '#63B3ED']; // Dorado (Exactos) y Azul claro (Tendencias)
 
