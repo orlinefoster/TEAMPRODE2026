@@ -6,6 +6,7 @@ interface GhostCreatorProps {
   onCreateGhost: (name: string) => Promise<void>;
   onEditGhost: (ghostUid: string, newName: string) => Promise<void>;
   onDeleteGhost: (ghostUid: string) => Promise<void>;
+  onClearGhostsPredictions?: () => Promise<void>;
   loading: boolean;
   error: string | null;
   successMessage: string | null;
@@ -16,6 +17,7 @@ export const GhostCreator: React.FC<GhostCreatorProps> = ({
   onCreateGhost,
   onEditGhost,
   onDeleteGhost,
+  onClearGhostsPredictions,
   loading,
   error,
   successMessage
@@ -149,9 +151,34 @@ export const GhostCreator: React.FC<GhostCreatorProps> = ({
 
       {/* Listado y Gestión de Fantasmas Existentes */}
       <div className="glass-panel" style={{ padding: '30px' }}>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '10px' }}>
-          👥 Administrar Participantes Fantasmas ({ghosts.length})
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '15px' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+            👥 Administrar Participantes Fantasmas ({ghosts.length})
+          </h3>
+          {ghosts.length > 0 && onClearGhostsPredictions && (
+            <button
+              onClick={async () => {
+                if (window.confirm('¿Estás seguro de que querés LIMPIAR por completo todas las predicciones de TODOS los fantasmas? Sus pronósticos y puntos se restablecerán a 0.')) {
+                  await onClearGhostsPredictions();
+                }
+              }}
+              className="btn"
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                backgroundColor: 'RGBA(239, 68, 68, 0.08)',
+                border: '1px solid var(--accent-error)',
+                color: 'var(--accent-error)',
+                fontWeight: 700,
+                borderRadius: '6px',
+                height: '34px'
+              }}
+              disabled={loading}
+            >
+              🧹 Limpiar Predicciones de Fantasmas
+            </button>
+          )}
+        </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
           Modificá el nombre o eliminá definitivamente los perfiles de prueba de la base de datos.
         </p>

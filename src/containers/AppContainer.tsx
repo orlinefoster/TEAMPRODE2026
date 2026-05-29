@@ -46,7 +46,8 @@ import {
   sealUserProdeInDB,
   randomizeAllGhostsGroupStagePredictions,
   updateGhostNameInDB,
-  deleteGhostFromDB
+  deleteGhostFromDB,
+  clearAllGhostsPredictionsInDB
 } from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
@@ -543,6 +544,23 @@ export const AppContainer: React.FC = () => {
     }
   };
 
+  // Acción Admin: Limpiar predicciones de TODOS los fantasmas
+  const handleClearGhostsPredictions = async () => {
+    setLoadingGhostRandomization(true);
+    setAdminGhostError(null);
+    setAdminGhostSuccess(null);
+    try {
+      await clearAllGhostsPredictionsInDB();
+      setAdminGhostSuccess('¡Todas las predicciones de participantes fantasmas fueron eliminadas!');
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error(err);
+      setAdminGhostError('Error al limpiar las predicciones de los fantasmas.');
+    } finally {
+      setLoadingGhostRandomization(false);
+    }
+  };
+
   // Acción Usuario: Guardado automático de predicciones
   const handleSavePrediction = async (matchId: string, homePrediction: number, awayPrediction: number) => {
     if (!user) return;
@@ -938,6 +956,7 @@ export const AppContainer: React.FC = () => {
                 onCreateGhost={handleCreateGhost}
                 onEditGhost={handleUpdateGhostName}
                 onDeleteGhost={handleDeleteGhost}
+                onClearGhostsPredictions={handleClearGhostsPredictions}
                 loading={adminGhostLoading}
                 error={adminGhostError}
                 successMessage={adminGhostSuccess}

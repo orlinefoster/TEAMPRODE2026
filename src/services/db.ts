@@ -1235,4 +1235,78 @@ export const deleteGhostFromDB = async (ghostUid: string): Promise<void> => {
   }
 };
 
+/**
+ * Elimina por completo todas las predicciones de todos los participantes fantasmas, restableciendo sus puntos a 0.
+ * Soporta entorno Mock con LocalStorage y Cloud Firestore.
+ */
+export const clearAllGhostsPredictionsInDB = async (): Promise<void> => {
+  const users = await getAllParticipantsFromDB();
+  const ghosts = users.filter(u => u.isGhost);
+  const ghostUids = ghosts.map(u => u.uid);
+
+  if (IS_MOCK_ENV) {
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    const predictions: Prediction[] = JSON.parse(predsJson);
+    const filteredPreds = predictions.filter(p => !ghostUids.includes(p.userId));
+    localStorage.setItem('prode_predictions', JSON.stringify(filteredPreds));
+
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const allUsers: UserProfile[] = JSON.parse(usersJson);
+    allUsers.forEach((u) => {
+      if (u.isGhost) {
+        u.completedProde = false;
+        u.points = 0;
+        u.exactMatchesCount = 0;
+        u.outcomeMatchesCount = 0;
+      }
+    });
+    localStorage.setItem('prode_users', JSON.stringify(allUsers));
+    console.log('🧹 Scenario: Predicciones de todos los fantasmas eliminadas en LocalStorage (Mock).');
+    return;
+  }
+
+  try {
+    let batch = writeBatch(db);
+    let count = 0;
+
+    for (const ghostUid of ghostUids) {
+      const predsQuery = query(collection(db, 'predictions'), where('userId', '==', ghostUid));
+      const snapshot = await getDocs(predsQuery);
+
+      snapshot.forEach((predDoc) => {
+        batch.delete(doc(db, 'predictions', predDoc.id));
+        count++;
+        if (count >= 400) {
+          batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      });
+
+      const userDocRef = doc(db, 'users', ghostUid);
+      batch.update(userDocRef, {
+        completedProde: false,
+        points: 0,
+        exactMatchesCount: 0,
+        outcomeMatchesCount: 0
+      });
+      count++;
+
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+
+    if (count > 0) {
+      await batch.commit();
+    }
+    console.log('🧹 Scenario: Predicciones de todos los fantasmas eliminadas en Firestore.');
+  } catch (err) {
+    console.error('Error al limpiar predicciones de fantasmas:', err);
+    throw err;
+  }
+};
+
 
