@@ -26,6 +26,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (displayName: string, photoURL: string) => Promise<void>;
   clearError: () => void;
+  reloadUserProfile: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -355,6 +356,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Recargar perfil de usuario desde Firestore / LocalStorage
+  const reloadUserProfile = async () => {
+    if (firebaseUser) {
+      if (IS_MOCK_ENV) {
+        const usersJson = localStorage.getItem('prode_users') || '[]';
+        const usersList: UserProfile[] = JSON.parse(usersJson);
+        const localUser = usersList.find(u => u.uid === firebaseUser.uid);
+        if (localUser) setUser(localUser);
+        return;
+      }
+      try {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setUser(userDoc.data() as UserProfile);
+        }
+      } catch (err) {
+        console.error('Error recargando perfil:', err);
+      }
+    }
+  };
+
   // Helper para traducción de errores Firebase Auth a Español
   const translateError = (code: string): string => {
     switch (code) {
@@ -393,7 +416,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       logout,
       resetPassword,
       updateUserProfile,
-      clearError
+      clearError,
+      reloadUserProfile
     }}>
       {children}
     </AuthContext.Provider>

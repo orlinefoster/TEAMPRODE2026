@@ -424,20 +424,6 @@ export const saveUserPrediction = async (
       predictions.push(newPrediction);
     }
     localStorage.setItem('prode_predictions', JSON.stringify(predictions));
-
-    // Validar si completó todo el prode (comparando cantidad de predicciones del usuario vs partidos cargados)
-    const userPreds = predictions.filter(p => p.userId === userId);
-    const matches = await getMatchesFromDB();
-    
-    if (userPreds.length >= matches.length) {
-      const usersJson = localStorage.getItem('prode_users') || '[]';
-      const users: UserProfile[] = JSON.parse(usersJson);
-      const userIndex = users.findIndex(u => u.uid === userId);
-      if (userIndex !== -1) {
-        users[userIndex].completedProde = true;
-        localStorage.setItem('prode_users', JSON.stringify(users));
-      }
-    }
     return;
   }
 
@@ -445,20 +431,6 @@ export const saveUserPrediction = async (
     // Guardar la predicción
     const predDocRef = doc(db, 'predictions', predictionId);
     await setDoc(predDocRef, newPrediction);
-
-    // Comprobar si completó el prode
-    const matchesSnapshot = await getDocs(collection(db, 'matches'));
-    const totalMatchesCount = matchesSnapshot.size;
-
-    const userPredsQuery = query(collection(db, 'predictions'), where('userId', '==', userId));
-    const userPredsSnapshot = await getDocs(userPredsQuery);
-    const userPredictionsCount = userPredsSnapshot.size;
-
-    if (userPredictionsCount >= totalMatchesCount) {
-      await updateDoc(doc(db, 'users', userId), {
-        completedProde: true
-      });
-    }
   } catch (err) {
     console.error('Error al guardar predicción:', err);
     throw err;
@@ -816,6 +788,34 @@ export const deleteAllPredictionsAndResetUsers = async (): Promise<void> => {
     console.log('🌱 DB: Todas las predicciones fueron borradas y perfiles reseteados en Cloud Firestore.');
   } catch (err) {
     console.error('Error borrando predicciones y reseteando usuarios:', err);
+    throw err;
+  }
+};
+
+
+/**
+ * Sella el prode de un usuario específico de forma manual e irreversible.
+ */
+export const sealUserProdeInDB = async (userId: string): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+    const userIndex = users.findIndex(u => u.uid === userId);
+    if (userIndex !== -1) {
+      users[userIndex].completedProde = true;
+      localStorage.setItem('prode_users', JSON.stringify(users));
+      console.log(`🔒 Mock: Prode sellado para el usuario ${userId}`);
+    }
+    return;
+  }
+
+  try {
+    await updateDoc(doc(db, 'users', userId), {
+      completedProde: true
+    });
+    console.log(`🔒 DB: Prode sellado con éxito para el usuario ${userId}`);
+  } catch (err) {
+    console.error('Error al sellar el prode:', err);
     throw err;
   }
 };

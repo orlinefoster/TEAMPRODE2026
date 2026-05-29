@@ -40,9 +40,9 @@ import {
   saveUserPrediction,
   getAllParticipantsFromDB,
   createGhostParticipant,
-  randomizeGhostPredictions,
   forceReseedMatchesInDB,
-  deleteAllPredictionsAndResetUsers
+  deleteAllPredictionsAndResetUsers,
+  sealUserProdeInDB
 } from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
@@ -57,7 +57,7 @@ const INITIAL_MOCK_WHITELIST: WhitelistEntry[] = [
 ];
 
 export const AppContainer: React.FC = () => {
-  const { user, loading, error, login, register, logout, resetPassword, updateUserProfile, clearError } = useAuth();
+  const { user, loading, error, login, register, logout, resetPassword, updateUserProfile, clearError, reloadUserProfile } = useAuth();
   
   // Ruteador SPA básico y ultra-resiliente
   const [guestView, setGuestView] = useState<GuestView>('login');
@@ -416,6 +416,20 @@ export const AppContainer: React.FC = () => {
     }
   };
 
+  // Acción: Sellar el prode del usuario logueado
+  const handleSealProde = async () => {
+    if (!user) return;
+    try {
+      await sealUserProdeInDB(user.uid);
+      if (reloadUserProfile) {
+        await reloadUserProfile();
+      }
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error('Error al sellar el prode:', err);
+    }
+  };
+
   // Acción Admin: Crear un participante fantasma de prueba
   const handleCreateGhost = async (name: string) => {
     setAdminGhostLoading(true);
@@ -681,6 +695,8 @@ export const AppContainer: React.FC = () => {
                     onSavePrediction={handleSavePrediction}
                     savingMatchId={savingPredictionMatchId}
                     savedMatchId={savedPredictionMatchId}
+                    user={user}
+                    onSealProde={handleSealProde}
                   />
                 )}
                 {prodeSubTab === 'calendar' && (
