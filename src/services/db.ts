@@ -821,3 +821,102 @@ export const sealUserProdeInDB = async (userId: string): Promise<void> => {
 };
 
 
+/**
+ * Devuelve el emoji de bandera correspondiente para un país de forma ultra-rápida.
+ */
+export const getCountryFlag = (countryName: string): string => {
+  if (!countryName) return '🏳️';
+  
+  const name = countryName.trim().toLowerCase();
+  
+  // Si es un placeholder de eliminatorias (ej: "W73", "RU89", "1A", "2B", "3ABCDF")
+  if (/^[wr][u]?\d+$/i.test(name) || /^\d+[a-l]+$/i.test(name) || /^[a-l\d]+$/i.test(name)) {
+    return '🏆'; // Copa dorada para indicar llave eliminatoria
+  }
+
+  const flags: Record<string, string> = {
+    // Sudamérica
+    'argentina': '🇦🇷',
+    'brasil': '🇧🇷',
+    'uruguay': '🇺🇾',
+    'colombia': '🇨🇴',
+    'ecuador': '🇪🇨',
+    'venezuela': '🇻🇪',
+    'paraguay': '🇵🇾',
+    'chile': '🇨🇱',
+    'perú': '🇵🇪',
+    'peru': '🇵🇪',
+    'bolivia': '🇧🇴',
+    
+    // Norte y Centroamérica
+    'estados unidos': '🇺🇸',
+    'usa': '🇺🇸',
+    'eeuu': '🇺🇸',
+    'ee.uu.': '🇺🇸',
+    'méxico': '🇲🇽',
+    'mexico': '🇲🇽',
+    'canadá': '🇨🇦',
+    'canada': '🇨🇦',
+    'costa rica': '🇨🇷',
+    'panamá': '🇵🇦',
+    'panama': '🇵🇦',
+    'honduras': '🇭🇳',
+    'el salvador': '🇸🇻',
+    'jamaica': '🇯🇲',
+    
+    // Europa
+    'francia': '🇫🇷',
+    'alemania': '🇩🇪',
+    'españa': '🇪🇸',
+    'espana': '🇪🇸',
+    'inglaterra': '🇬🇧',
+    'italia': '🇮🇹',
+    'bélgica': '🇧🇪',
+    'belgica': '🇧🇪',
+    'países bajos': '🇳🇱',
+    'paises bajos': '🇳🇱',
+    'holanda': '🇳🇱',
+    'portugal': '🇵🇹',
+    'croacia': '🇭🇷',
+    'suiza': '🇨🇭',
+    'dinamarca': '🇩🇰',
+    'polonia': '🇵🇱',
+    'suecia': '🇸🇪',
+    'ucrania': '🇺🇦',
+    'austria': '🇦🇹',
+    'turquía': '🇹🇷',
+    'turquia': '🇹🇷',
+    'escocia': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    'gales': '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
+    
+    // África
+    'marruecos': '🇲🇦',
+    'senegal': '🇸🇳',
+    'túnez': '🇹🇳',
+    'tunez': '🇹🇳',
+    'camerún': '🇨🇲',
+    'camerun': '🇨🇲',
+    'ghana': '🇬🇭',
+    'nigeria': '🇳🇬',
+    'argelia': '🇩🇿',
+    'egipto': '🇪🇬',
+    
+    // Asia y Oceanía
+    'japón': '🇯🇵',
+    'japon': '🇯🇵',
+    'corea del sur': '🇰🇷',
+    'australia': '🇦🇺',
+    'arabia saudita': '🇸🇦',
+    'arabia saudí': '🇸🇦',
+    'irán': '🇮🇷',
+    'iran': '🇮🇷',
+    'qatar': '🇶🇦',
+    'nueva zelanda': '🇳🇿',
+    'sudáfrica': '🇿🇦',
+    'sudafrica': '🇿🇦'
+  };
+
+  return flags[name] || '🏳️';
+};
+
+
