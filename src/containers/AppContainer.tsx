@@ -48,8 +48,8 @@ import {
 
 type GuestView = 'login' | 'register' | 'forgot';
 type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile';
-type ProdeSubTab = 'fill' | 'calendar' | 'scenario' | 'stats' | 'participants';
-type AdminSubTab = 'whitelist' | 'scheduler' | 'results' | 'ghosts' | 'system';
+type ProdeSubTab = 'fill' | 'calendar' | 'stats' | 'participants';
+type AdminSubTab = 'whitelist' | 'scheduler' | 'results' | 'ghosts' | 'scenario' | 'system';
 
 // Mock inicial de correos permitidos para desarrollo local
 const INITIAL_MOCK_WHITELIST: WhitelistEntry[] = [
@@ -654,20 +654,6 @@ export const AppContainer: React.FC = () => {
                   📅 Calendario
                 </button>
                 <button
-                  onClick={() => setProdeSubTab('scenario')}
-                  className="btn"
-                  style={{
-                    padding: '8px 14px',
-                    fontSize: '0.85rem',
-                    borderRadius: '6px',
-                    backgroundColor: prodeSubTab === 'scenario' ? 'var(--border-light)' : 'transparent',
-                    color: prodeSubTab === 'scenario' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    fontWeight: 600
-                  }}
-                >
-                  🔮 Modo Escenario
-                </button>
-                <button
                   onClick={() => setProdeSubTab('stats')}
                   className="btn"
                   style={{
@@ -724,13 +710,7 @@ export const AppContainer: React.FC = () => {
                     isAdmin={isAdmin}
                     onEditMatch={(match) => setSelectedMatchToEdit(match)}
                   />
-                )}
-                {prodeSubTab === 'scenario' && (
-                  <ScenarioSimulator 
-                    matches={matches}
-                    allPredictions={allPredictions}
-                    users={participants}
-                  />
+
                 )}
                 {prodeSubTab === 'stats' && (
                   <DashboardStats users={participants} />
@@ -870,6 +850,22 @@ export const AppContainer: React.FC = () => {
               >
                 ⚙️ Mantenimiento
               </button>
+              <button
+                onClick={() => setAdminSubTab('scenario')}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.9rem',
+                  borderRadius: '6px',
+                  backgroundColor: adminSubTab === 'scenario' ? 'var(--border-light)' : 'transparent',
+                  color: adminSubTab === 'scenario' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  border: '1px solid',
+                  borderColor: adminSubTab === 'scenario' ? 'var(--border-active)' : 'transparent',
+                  fontWeight: 600
+                }}
+              >
+                🔮 Modo Escenario
+              </button>
             </div>
 
             {/* Renderizado Condicional de Sub-vistas Admin */}
@@ -906,6 +902,13 @@ export const AppContainer: React.FC = () => {
                 matches={matches}
                 onSaveResult={handleSaveMatchResult}
                 loading={adminSavingResult}
+              />
+            )}
+            {adminSubTab === 'scenario' && (
+              <ScenarioSimulator 
+                matches={matches}
+                allPredictions={allPredictions}
+                users={participants}
               />
             )}
             {adminSubTab === 'system' && (

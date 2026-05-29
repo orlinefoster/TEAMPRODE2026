@@ -89,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 backgroundColor: activePage === 'whitelist' ? 'var(--bg-overlay)' : 'transparent'
               }}
             >
-              Whitelist (Admin)
+              Panel de Admin
             </button>
           )}
         </div>
