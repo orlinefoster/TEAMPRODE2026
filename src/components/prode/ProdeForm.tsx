@@ -11,7 +11,7 @@ interface ProdeFormProps {
   onSealProde?: () => Promise<void>;
 }
 
-const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'Eliminatorias'];
+const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
 export const ProdeForm: React.FC<ProdeFormProps> = ({
   matches,
@@ -29,10 +29,13 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [sealingLoading, setSealingLoading] = useState(false);
 
+  // Filtrar solo los partidos de la Fase de grupos para el prode (primeros 72 partidos)
+  const groupStageMatches = matches.filter(m => m.phase === 'Fase de grupos');
+
   // Sincronizar predicciones existentes en el estado local de los inputs
   useEffect(() => {
     const states: Record<string, { home: string; away: string }> = {};
-    matches.forEach((match) => {
+    groupStageMatches.forEach((match) => {
       const pred = predictions.find((p) => p.matchId === match.matchId);
       states[match.matchId] = {
         home: pred !== undefined ? String(pred.homePrediction) : '',
@@ -81,12 +84,12 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
     });
   };
 
-  // Agrupamiento por fechas
+  // Agrupamiento por fechas (exclusivo fase de grupos)
   const matchesByDate: Record<string, Match[]> = {};
   const dateKeys: string[] = [];
 
   if (viewType === 'date') {
-    const sorted = [...matches].sort((a, b) => a.date - b.date);
+    const sorted = [...groupStageMatches].sort((a, b) => a.date - b.date);
     sorted.forEach((m) => {
       const key = getFormattedDateKey(m.date);
       if (!matchesByDate[key]) {
@@ -118,15 +121,13 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
     }));
   };
 
-  const groupMatches = matches.filter((m) => {
-    if (selectedGroup === 'Eliminatorias') {
-      return m.phase && m.phase !== 'Fase de grupos';
-    }
+  const groupMatches = groupStageMatches.filter((m) => {
     return m.group === selectedGroup && m.phase === 'Fase de grupos';
   });
 
-  const totalMatchesCount = matches.length;
-  const predictedCount = predictions.length;
+  const totalMatchesCount = groupStageMatches.length;
+  // Solo contar predicciones de partidos que pertenezcan a la fase de grupos
+  const predictedCount = predictions.filter(p => groupStageMatches.some(m => m.matchId === p.matchId)).length;
   const isAllPredicted = totalMatchesCount > 0 && predictedCount >= totalMatchesCount;
 
   const handleSealClick = async () => {
@@ -333,7 +334,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
             🔒 ¡Prode 100% Completado! Hora de Sellar tus Predicciones
           </h3>
           <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
-            Felicitaciones, completaste los 104 pronósticos del torneo. Para validar tu participación, debés sellar tu prode. Una vez sellado, **no podrás realizar modificaciones a tus predicciones nunca más**.
+            Felicitaciones, completaste los 72 pronósticos de la Fase de grupos del torneo. Para validar tu participación, debés sellar tu prode. Una vez sellado, **no podrás realizar modificaciones a tus predicciones nunca más**.
           </p>
           <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', cursor: 'pointer', color: 'var(--text-main)' }}>
             <input
@@ -431,10 +432,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
           <div className="glass-panel" style={{ padding: '15px 20px', overflowX: 'auto', display: 'flex', gap: '8px' }}>
             {GROUPS.map((g) => {
               // Contar cuántos partidos de este grupo ya predijo el usuario
-              const groupMatchIds = matches.filter(m => {
-                if (g === 'Eliminatorias') {
-                  return m.phase && m.phase !== 'Fase de grupos';
-                }
+              const groupMatchIds = groupStageMatches.filter(m => {
                 return m.group === g && m.phase === 'Fase de grupos';
               }).map(m => m.matchId);
               
@@ -458,7 +456,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
                     position: 'relative'
                   }}
                 >
-                  {g === 'Eliminatorias' ? g : `Grupo ${g}`}
+                  Grupo {g}
                   {isGroupCompleted && (
                     <span style={{
                       position: 'absolute',
