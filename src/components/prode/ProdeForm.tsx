@@ -203,7 +203,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
               overflow: 'hidden', 
               textOverflow: 'ellipsis', 
               whiteSpace: 'nowrap',
-              maxWidth: '120px' 
+              maxWidth: '220px' 
             }} title={match.homeTeam}>
               {match.homeTeam}
             </span>
@@ -259,7 +259,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
               overflow: 'hidden', 
               textOverflow: 'ellipsis', 
               whiteSpace: 'nowrap',
-              maxWidth: '120px' 
+              maxWidth: '220px' 
             }} title={match.awayTeam}>
               {match.awayTeam}
             </span>
