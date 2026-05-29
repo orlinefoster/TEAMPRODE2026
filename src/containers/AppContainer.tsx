@@ -784,7 +784,11 @@ export const AppContainer: React.FC = () => {
 
                 )}
                 {prodeSubTab === 'stats' && (
-                  <DashboardStats users={participants} />
+                  <DashboardStats 
+                    users={participants} 
+                    matches={matches}
+                    predictions={allPredictions}
+                  />
                 )}
                 {prodeSubTab === 'participants' && (
                   <ParticipantsTable 

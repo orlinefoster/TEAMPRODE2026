@@ -507,7 +507,12 @@ export const ScenarioSimulator: React.FC<ScenarioSimulatorProps> = ({
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '10px' }}>
                 📊 Proyección de Estadísticas Generales en este Escenario
               </h3>
-              <DashboardStats users={simulatedUsers} includeGhosts={true} />
+              <DashboardStats 
+                users={simulatedUsers} 
+                matches={simulatedMatches}
+                predictions={allPredictions}
+                includeGhosts={true} 
+              />
             </div>
           )}
         </>
