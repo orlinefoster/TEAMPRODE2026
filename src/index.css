@@ -46,6 +46,7 @@ body {
   min-height: 100vh;
   line-height: 1.5;
   overflow-x: hidden;
+  overflow-y: scroll;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -80,6 +81,15 @@ button, input {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+/* Ocultar scrollbar pero mantener funcionalidad */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Glassmorphism Panel */
@@ -197,6 +207,16 @@ button, input {
 .form-input::placeholder {
   color: var(--text-muted);
   opacity: 0.6;
+}
+
+/* Ocultar flechas de inputs numéricos */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+input[type=number] {
+  -moz-appearance: textfield; /* Firefox */
 }
 
 /* Shimmer Animation (Skeleton Loader) */

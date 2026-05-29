@@ -9,7 +9,8 @@ import {
   getDoc,
   updateDoc,
   serverTimestamp,
-  deleteField
+  deleteField,
+  deleteDoc
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from './firebase';
 import type { Match, Prediction, UserProfile } from '../types';
@@ -568,6 +569,32 @@ export const saveUserPrediction = async (
     await setDoc(predDocRef, newPrediction);
   } catch (err) {
     console.error('Error al guardar predicción:', err);
+    throw err;
+  }
+};
+
+/**
+ * Borra una predicción individual de la base de datos o LocalStorage.
+ */
+export const clearUserPrediction = async (
+  userId: string,
+  matchId: string
+): Promise<void> => {
+  const predictionId = `${userId}_${matchId}`;
+  
+  if (IS_MOCK_ENV) {
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    const predictions: Prediction[] = JSON.parse(predsJson);
+    const filtered = predictions.filter(p => p.predictionId !== predictionId);
+    localStorage.setItem('prode_predictions', JSON.stringify(filtered));
+    return;
+  }
+
+  try {
+    const predDocRef = doc(db, 'predictions', predictionId);
+    await deleteDoc(predDocRef);
+  } catch (err) {
+    console.error('Error al borrar predicción:', err);
     throw err;
   }
 };
@@ -1149,6 +1176,83 @@ export const randomizeAllGhostsGroupStagePredictions = async (): Promise<void> =
     console.log('🎲 Scenario: Se aleatorizaron las predicciones de la Fase de grupos para TODOS los fantasmas en Firestore.');
   } catch (err) {
     console.error('Error al aleatorizar predicciones grupales de fantasmas:', err);
+    throw err;
+  }
+};
+
+/**
+ * Aleatoriza las predicciones de TODOS los participantes fantasmas "SOLO PARA LA FASE DE ELIMINATORIAS".
+ * Soporta entorno Mock con LocalStorage y Cloud Firestore.
+ */
+export const randomizeAllGhostsKnockoutStagePredictions = async (): Promise<void> => {
+  const users = await getAllParticipantsFromDB();
+  const ghosts = users.filter(u => u.isGhost);
+  const matches = await getMatchesFromDB();
+  const knockoutMatches = matches.filter(m => m.phase !== 'Fase de grupos');
+
+  if (IS_MOCK_ENV) {
+    const predsJson = localStorage.getItem('prode_predictions') || '[]';
+    let predictions: Prediction[] = JSON.parse(predsJson);
+
+    ghosts.forEach((ghost) => {
+      predictions = predictions.filter(p => !(p.userId === ghost.uid && knockoutMatches.some(m => m.matchId === p.matchId)));
+
+      knockoutMatches.forEach((match) => {
+        const predictionId = `${ghost.uid}_${match.matchId}`;
+        const homePrediction = Math.floor(Math.random() * 5); // 0 a 4 goles
+        const awayPrediction = Math.floor(Math.random() * 5);
+
+        predictions.push({
+          predictionId,
+          userId: ghost.uid,
+          matchId: match.matchId,
+          homePrediction,
+          awayPrediction,
+          calculated: false
+        });
+      });
+    });
+
+    localStorage.setItem('prode_predictions', JSON.stringify(predictions));
+    console.log('🎲 Scenario: Se aleatorizaron las predicciones de la Fase de Eliminatorias para TODOS los fantasmas en LocalStorage (Mock).');
+    return;
+  }
+
+  try {
+    let batch = writeBatch(db);
+    let count = 0;
+
+    for (const ghost of ghosts) {
+      for (const match of knockoutMatches) {
+        const predictionId = `${ghost.uid}_${match.matchId}`;
+        const homePrediction = Math.floor(Math.random() * 5);
+        const awayPrediction = Math.floor(Math.random() * 5);
+
+        const predDocRef = doc(db, 'predictions', predictionId);
+        batch.set(predDocRef, {
+          predictionId,
+          userId: ghost.uid,
+          matchId: match.matchId,
+          homePrediction,
+          awayPrediction,
+          calculated: false
+        });
+
+        count++;
+        if (count >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+    }
+
+    if (count > 0) {
+      await batch.commit();
+    }
+    console.log('🎲 Scenario: Se aleatorizaron las predicciones de la Fase de Eliminatorias para TODOS los fantasmas en Firestore.');
+  } catch (err) {
+    console.error('Error al aleatorizar predicciones de eliminatorias de fantasmas:', err);
     throw err;
   }
 };

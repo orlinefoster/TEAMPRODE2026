@@ -5,6 +5,7 @@ interface ProdeFormProps {
   matches: Match[];
   predictions: Prediction[];
   onSavePrediction: (matchId: string, homePrediction: number, awayPrediction: number) => Promise<void>;
+  onClearPrediction?: (matchId: string) => Promise<void>;
   savingMatchId: string | null;
   savedMatchId: string | null;
   user: UserProfile | null;
@@ -17,6 +18,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
   matches,
   predictions,
   onSavePrediction,
+  onClearPrediction,
   savingMatchId,
   savedMatchId,
   user,
@@ -271,8 +273,41 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
           {savingMatchId === match.matchId && (
             <span style={{ fontSize: '0.8rem', color: 'var(--accent-gold)' }}>💾 Guardando...</span>
           )}
-          {savedMatchId === match.matchId && savingMatchId !== match.matchId && (
-            <span style={{ fontSize: '0.8rem', color: 'var(--accent-green)', fontWeight: 600 }}>✅ Guardado</span>
+          {pred && pred.homePrediction !== undefined && savingMatchId !== match.matchId && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--accent-green)', fontWeight: 600 }}>✅ Guardado</span>
+              {!isLocked && (
+                <button
+                  onClick={async () => {
+                    if (onClearPrediction) {
+                      await onClearPrediction(match.matchId);
+                      setInputStates(prev => {
+                        const next = { ...prev };
+                        delete next[match.matchId];
+                        return next;
+                      });
+                    }
+                  }}
+                  title="Borrar pronóstico"
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2px',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
+                  onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           )}
           
           {match.status === 'played' && pred && pred.pointsEarned !== undefined && (
@@ -425,8 +460,15 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
       {/* Vista de Grupos */}
       {viewType === 'group' && (
         <>
-          {/* Pestañas de Grupos */}
-          <div className="glass-panel" style={{ padding: '15px 20px', overflowX: 'auto', display: 'flex', gap: '8px' }}>
+          <div className="hide-scrollbar" style={{ 
+            overflowX: 'auto', 
+            display: 'flex', 
+            gap: '8px', 
+            padding: '4px 0 16px 0',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            WebkitOverflowScrolling: 'touch'
+          }}>
             {GROUPS.map((g) => {
               // Contar cuántos partidos de este grupo ya predijo el usuario
               const groupMatchIds = groupStageMatches.filter(m => {
@@ -442,15 +484,18 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
                   onClick={() => setSelectedGroup(g)}
                   className="btn"
                   style={{
-                    padding: '8px 16px',
-                    fontSize: '0.9rem',
+                    padding: '8px 14px',
+                    fontSize: '0.85rem',
                     borderRadius: '8px',
                     backgroundColor: selectedGroup === g ? 'var(--accent-gold)' : 'var(--bg-overlay)',
                     color: selectedGroup === g ? 'var(--text-dark)' : 'var(--text-main)',
                     border: '1px solid',
                     borderColor: selectedGroup === g ? 'var(--accent-gold)' : 'var(--border-light)',
                     whiteSpace: 'nowrap',
-                    position: 'relative'
+                    position: 'relative',
+                    boxShadow: selectedGroup === g ? '0 4px 12px RGBA(212, 163, 89, 0.2)' : 'none',
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer'
                   }}
                 >
                   Grupo {g}

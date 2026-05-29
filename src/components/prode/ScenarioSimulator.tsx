@@ -8,13 +8,15 @@ interface ScenarioSimulatorProps {
   allPredictions: Prediction[];
   users: UserProfile[];
   onRandomizeAllGhosts?: () => Promise<void>;
+  onRandomizeAllGhostsKnockout?: () => Promise<void>;
 }
 
 export const ScenarioSimulator: React.FC<ScenarioSimulatorProps> = ({
   matches,
   allPredictions,
   users,
-  onRandomizeAllGhosts
+  onRandomizeAllGhosts,
+  onRandomizeAllGhostsKnockout
 }) => {
   const [isActive, setIsActive] = useState(false);
   const [simulatedMatches, setSimulatedMatches] = useState<Match[]>([]);
@@ -267,7 +269,28 @@ export const ScenarioSimulator: React.FC<ScenarioSimulatorProps> = ({
                     fontWeight: 700
                   }}
                 >
-                  👻 Aleatorizar Fantasmas (Fase de Grupos)
+                  👻 Aleatorizar Fantasmas (Grupos)
+                </button>
+              )}
+              {onRandomizeAllGhostsKnockout && (
+                <button
+                  onClick={async () => {
+                    if (window.confirm('¿Estás seguro de que querés aleatorizar las predicciones de la FASE DE ELIMINATORIAS para TODOS los fantasmas de forma irreversible?')) {
+                      await onRandomizeAllGhostsKnockout();
+                    }
+                  }}
+                  className="btn"
+                  style={{ 
+                    fontSize: '0.85rem', 
+                    padding: '6px 14px', 
+                    height: 'auto', 
+                    backgroundColor: 'RGBA(212, 163, 89, 0.1)', 
+                    border: '1px solid var(--accent-gold)',
+                    color: 'var(--accent-gold)',
+                    fontWeight: 700
+                  }}
+                >
+                  👻 Aleatorizar Fantasmas (Eliminatorias)
                 </button>
               )}
             </div>

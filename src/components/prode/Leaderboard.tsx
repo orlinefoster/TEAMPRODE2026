@@ -29,7 +29,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   );
 
   return (
-    <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto', padding: '10px 0' }}>
+    <div style={{ width: '100%', margin: '0 auto', padding: '10px 0' }}>
       <div className="glass-panel" style={{ padding: '30px', marginBottom: '25px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginBottom: '20px' }}>
           <div>

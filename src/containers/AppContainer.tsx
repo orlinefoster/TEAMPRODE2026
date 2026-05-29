@@ -39,20 +39,22 @@ import {
   updateMatchMetadataInDB,
   getUserPredictions,
   saveUserPrediction,
+  clearUserPrediction,
   getAllParticipantsFromDB,
   createGhostParticipant,
   forceReseedMatchesInDB,
   deleteAllPredictionsAndResetUsers,
   sealUserProdeInDB,
+  randomizeGhostPredictions,
   randomizeAllGhostsGroupStagePredictions,
+  randomizeAllGhostsKnockoutStagePredictions,
   updateGhostNameInDB,
   deleteGhostFromDB,
   clearAllGhostsPredictionsInDB
 } from '../services/db';
 
 type GuestView = 'login' | 'register' | 'forgot';
-type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile';
-type ProdeSubTab = 'fill' | 'calendar' | 'stats' | 'participants';
+type MemberView = 'prode' | 'leaderboard' | 'whitelist' | 'profile' | 'calendar';
 type AdminSubTab = 'whitelist' | 'scheduler' | 'results' | 'ghosts' | 'scenario' | 'system';
 
 // Mock inicial de correos permitidos para desarrollo local
@@ -68,8 +70,8 @@ export const AppContainer: React.FC = () => {
   const [guestView, setGuestView] = useState<GuestView>('login');
   const [memberView, setMemberView] = useState<MemberView>('prode');
   
-  // Sub-navegación dentro de "Mi Prode"
-  const [prodeSubTab, setProdeSubTab] = useState<ProdeSubTab>('stats');
+  // Estado para mostrar más estadísticas dentro del Ranking
+  const [showStats, setShowStats] = useState(false);
 
   // Sub-navegación exclusiva para panel de administración
   const [adminSubTab, setAdminSubTab] = useState<AdminSubTab>('whitelist');
@@ -155,7 +157,8 @@ export const AppContainer: React.FC = () => {
 
       // Cargar listado de participantes
       const parts = await getAllParticipantsFromDB();
-      setParticipants(parts);
+      const filteredParts = user.role === 'admin' ? parts : parts.filter(p => !p.isGhost);
+      setParticipants(filteredParts);
 
       // Cargar TODAS las predicciones del torneo (necesario para el Modo Escenario)
       if (IS_MOCK_ENV) {
@@ -178,7 +181,7 @@ export const AppContainer: React.FC = () => {
     if (user) {
       loadPredictionsAndParticipants();
     }
-  }, [user, memberView, prodeSubTab]);
+  }, [user, memberView]);
 
   // Escuchar a la Whitelist en tiempo real (si es Admin y no es Mock)
   useEffect(() => {
@@ -544,6 +547,20 @@ export const AppContainer: React.FC = () => {
     }
   };
 
+  // Acción Admin: Aleatorizar predicciones de TODOS los fantasmas "SOLO FASE DE ELIMINATORIAS"
+  const handleRandomizeAllGhostsKnockoutStage = async () => {
+    setLoadingGhostRandomization(true);
+    try {
+      await randomizeAllGhostsKnockoutStagePredictions();
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error(err);
+      alert('Error al aleatorizar predicciones de fase de eliminatorias de fantasmas.');
+    } finally {
+      setLoadingGhostRandomization(false);
+    }
+  };
+
   // Acción Admin: Limpiar predicciones de TODOS los fantasmas
   const handleClearGhostsPredictions = async () => {
     setLoadingGhostRandomization(true);
@@ -572,14 +589,24 @@ export const AppContainer: React.FC = () => {
       // Actualizar estado local inmediato
       setSavedPredictionMatchId(matchId);
       await loadPredictionsAndParticipants();
-      
-      // Borrar mensaje de guardado tras 2.5s
-      setTimeout(() => {
-        setSavedPredictionMatchId((curr) => curr === matchId ? null : curr);
-      }, 2500);
     } catch (err) {
       console.error('Error guardando predicción:', err);
       alert('Hubo un error al guardar tu predicción. Reintentá.');
+    } finally {
+      setSavingPredictionMatchId(null);
+    }
+  };
+
+  // Acción Usuario: Borrar una predicción
+  const handleClearPrediction = async (matchId: string) => {
+    if (!user) return;
+    setSavingPredictionMatchId(matchId);
+    try {
+      await clearUserPrediction(user.uid, matchId);
+      await loadPredictionsAndParticipants();
+    } catch (err) {
+      console.error('Error borrando predicción:', err);
+      alert('Hubo un error al borrar tu predicción.');
     } finally {
       setSavingPredictionMatchId(null);
     }
@@ -680,163 +707,120 @@ export const AppContainer: React.FC = () => {
         onLogout={logout}
       />
 
-      <main className="container" style={{ flex: 1, padding: '40px 20px' }}>
+      <main style={{ 
+        flex: 1, 
+        padding: '40px 20px',
+        margin: '0 auto',
+        width: '100%',
+        maxWidth: memberView === 'leaderboard' || memberView === 'calendar' || (memberView === 'whitelist' && adminSubTab === 'scenario') ? '100%' : '1200px',
+        transition: 'max-width 0.3s ease-in-out'
+      }}>
         {memberView === 'prode' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
             {/* Header y Sub-Navegación del Game Hub */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
                 <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', marginBottom: '4px' }}>
                   Game Hub Mundialista 2026
                 </h2>
                 <p style={{ color: 'var(--text-muted)' }}>
-                  Completá tus pronósticos, revisá partidos, analizá participantes y jugá con el Modo Escenario.
+                  Completá tus pronóstico.
                 </p>
-              </div>
-
-              {/* Selector de Sub-pestañas */}
-              <div className="glass-panel" style={{ padding: '6px', display: 'flex', gap: '5px' }}>
-                <button
-                  onClick={() => setProdeSubTab('fill')}
-                  className="btn"
-                  style={{
-                    padding: '8px 14px',
-                    fontSize: '0.85rem',
-                    borderRadius: '6px',
-                    backgroundColor: prodeSubTab === 'fill' ? 'var(--border-light)' : 'transparent',
-                    color: prodeSubTab === 'fill' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    fontWeight: 600
-                  }}
-                >
-                  📝 Llenar Prode
-                </button>
-                <button
-                  onClick={() => setProdeSubTab('calendar')}
-                  className="btn"
-                  style={{
-                    padding: '8px 14px',
-                    fontSize: '0.85rem',
-                    borderRadius: '6px',
-                    backgroundColor: prodeSubTab === 'calendar' ? 'var(--border-light)' : 'transparent',
-                    color: prodeSubTab === 'calendar' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    fontWeight: 600
-                  }}
-                >
-                  📅 Calendario
-                </button>
-                <button
-                  onClick={() => setProdeSubTab('stats')}
-                  className="btn"
-                  style={{
-                    padding: '8px 14px',
-                    fontSize: '0.85rem',
-                    borderRadius: '6px',
-                    backgroundColor: prodeSubTab === 'stats' ? 'var(--border-light)' : 'transparent',
-                    color: prodeSubTab === 'stats' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    fontWeight: 600
-                  }}
-                >
-                  📊 Estadísticas
-                </button>
-                <button
-                  onClick={() => setProdeSubTab('participants')}
-                  className="btn"
-                  style={{
-                    padding: '8px 14px',
-                    fontSize: '0.85rem',
-                    borderRadius: '6px',
-                    backgroundColor: prodeSubTab === 'participants' ? 'var(--border-light)' : 'transparent',
-                    color: prodeSubTab === 'participants' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    fontWeight: 600
-                  }}
-                >
-                  👥 Participantes
-                </button>
               </div>
             </div>
 
             {/* Renderizado de Sub-pestañas */}
-            {matchesLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="skeleton" style={{ height: '80px', borderRadius: '12px' }}></div>
-                ))}
-              </div>
-            ) : (
-              <>
-                {prodeSubTab === 'fill' && (
-                  <ProdeForm 
-                    matches={matches}
-                    predictions={predictions}
-                    onSavePrediction={handleSavePrediction}
-                    savingMatchId={savingPredictionMatchId}
-                    savedMatchId={savedPredictionMatchId}
-                    user={user}
-                    onSealProde={handleSealProde}
-                  />
-                )}
-                {prodeSubTab === 'calendar' && (
-                  <MatchList 
-                    matches={matches} 
-                    isAdmin={isAdmin}
-                    onEditMatch={(match) => setSelectedMatchToEdit(match)}
-                  />
-
-                )}
-                {prodeSubTab === 'stats' && (
-                  <DashboardStats 
-                    users={participants} 
-                    matches={matches}
-                    predictions={allPredictions}
-                  />
-                )}
-                {prodeSubTab === 'participants' && (
-                  <ParticipantsTable 
-                    users={participants}
-                    onSelectUser={handleSelectParticipant}
-                    selectedUser={selectedParticipantDetail}
-                    selectedUserPredictions={selectedParticipantPreds}
-                    matches={matches}
-                    onClosePredictionsPanel={() => {
-                      setSelectedParticipantDetail(null);
-                      setSelectedParticipantPreds([]);
-                    }}
-                    isAdmin={isAdmin}
-                    onRandomizeGhost={handleRandomizeGhostPredictions}
-                    loadingGhost={loadingGhostRandomization}
-                  />
-                )}
-              </>
-            )}
+            <div className="hide-scrollbar" style={{ height: '75vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingRight: '5px' }}>
+              {matchesLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="skeleton" style={{ height: '80px', borderRadius: '12px' }}></div>
+                  ))}
+                </div>
+              ) : (
+                <ProdeForm 
+                  matches={matches}
+                  predictions={predictions}
+                  onSavePrediction={handleSavePrediction}
+                  onClearPrediction={handleClearPrediction}
+                  savingMatchId={savingPredictionMatchId}
+                  savedMatchId={savedPredictionMatchId}
+                  user={user}
+                  onSealProde={handleSealProde}
+                />
+              )}
+            </div>
+          </div>
+        )}
+        {memberView === 'calendar' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+            <MatchList 
+              matches={matches} 
+              isAdmin={isAdmin}
+              onEditMatch={(match) => setSelectedMatchToEdit(match)}
+            />
           </div>
         )}
 
         {memberView === 'leaderboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-            <Leaderboard 
-              users={participants}
-              onSelectUser={handleSelectParticipant}
-              isAdmin={isAdmin}
-            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+              <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', margin: 0 }}>
+                Ranking Global
+              </h2>
+              <button
+                onClick={() => setShowStats(!showStats)}
+                className="btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.9rem',
+                  borderRadius: '6px',
+                  backgroundColor: showStats ? 'var(--border-light)' : 'transparent',
+                  color: showStats ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  border: '1px solid',
+                  borderColor: showStats ? 'var(--border-active)' : 'transparent',
+                  fontWeight: 600,
+                  transition: 'all 0.2s'
+                }}
+              >
+                {showStats ? 'Ocultar Estadísticas' : '📊 Más estadísticas'}
+              </button>
+            </div>
 
-            {/* Panel flotante de detalle si seleccionan un usuario */}
-            {selectedParticipantDetail && (
-              <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto' }}>
-                <ParticipantsTable 
+            {showStats ? (
+              <DashboardStats 
+                users={participants} 
+                matches={matches}
+                predictions={allPredictions}
+              />
+            ) : (
+              <>
+                <Leaderboard 
                   users={participants}
                   onSelectUser={handleSelectParticipant}
-                  selectedUser={selectedParticipantDetail}
-                  selectedUserPredictions={selectedParticipantPreds}
-                  matches={matches}
-                  onClosePredictionsPanel={() => {
-                    setSelectedParticipantDetail(null);
-                    setSelectedParticipantPreds([]);
-                  }}
                   isAdmin={isAdmin}
-                  onRandomizeGhost={handleRandomizeGhostPredictions}
-                  loadingGhost={loadingGhostRandomization}
                 />
-              </div>
+
+                {/* Panel flotante de detalle si seleccionan un usuario */}
+                {selectedParticipantDetail && (
+                  <div style={{ width: '100%', margin: '0 auto' }}>
+                    <ParticipantsTable 
+                      users={participants}
+                      onSelectUser={handleSelectParticipant}
+                      selectedUser={selectedParticipantDetail}
+                      selectedUserPredictions={selectedParticipantPreds}
+                      matches={matches}
+                      onClosePredictionsPanel={() => {
+                        setSelectedParticipantDetail(null);
+                        setSelectedParticipantPreds([]);
+                      }}
+                      isAdmin={isAdmin}
+                      onRandomizeGhost={handleRandomizeGhostPredictions}
+                      loadingGhost={loadingGhostRandomization}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -844,7 +828,7 @@ export const AppContainer: React.FC = () => {
         {memberView === 'whitelist' && isAdmin && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Sub-Navegación Admin */}
-            <div className="glass-panel" style={{ padding: '10px 20px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+            <div className="glass-panel" style={{ padding: '10px 20px', display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setAdminSubTab('whitelist')}
                 className="btn"
@@ -989,6 +973,7 @@ export const AppContainer: React.FC = () => {
                 allPredictions={allPredictions}
                 users={participants}
                 onRandomizeAllGhosts={handleRandomizeAllGhostsGroupStage}
+                onRandomizeAllGhostsKnockout={handleRandomizeAllGhostsKnockoutStage}
               />
             )}
             {adminSubTab === 'system' && (

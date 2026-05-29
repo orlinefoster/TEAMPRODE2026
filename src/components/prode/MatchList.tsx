@@ -115,9 +115,6 @@ export const MatchList: React.FC<MatchListProps> = ({
             <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
               📅 Calendario del Torneo
             </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '2px 0 0 0' }}>
-              Alterná entre vistas mensuales y semanales para monitorear partidos solapados.
-            </p>
           </div>
 
           <div className="glass-panel" style={{ padding: '4px', display: 'flex', gap: '4px' }}>
@@ -155,7 +152,7 @@ export const MatchList: React.FC<MatchListProps> = ({
         {/* Destacador por Grupo */}
         <div>
           <span className="form-label" style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Destacar partidos por Grupo (el resto se atenuará en gris):
+            Destacar partidos por Grupo:
           </span>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }}>
             {GROUPS.map((group) => (

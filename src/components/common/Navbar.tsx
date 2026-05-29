@@ -60,6 +60,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
           
           <button 
+            onClick={() => onNavigate('calendar')} 
+            style={{ 
+              fontWeight: 600, 
+              fontSize: '0.95rem',
+              color: activePage === 'calendar' ? 'var(--accent-gold)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              transition: 'color 0.2s',
+              backgroundColor: activePage === 'calendar' ? 'var(--bg-overlay)' : 'transparent'
+            }}
+          >
+            Calendario
+          </button>
+
+          <button 
             onClick={() => onNavigate('leaderboard')} 
             style={{ 
               fontWeight: 600, 
@@ -72,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               backgroundColor: activePage === 'leaderboard' ? 'var(--bg-overlay)' : 'transparent'
             }}
           >
-            Tabla Social
+            Ranking
           </button>
 
           {user.role === 'admin' && (
