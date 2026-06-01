@@ -10,8 +10,7 @@ import {
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { auth, db, storage, IS_MOCK_ENV } from '../services/firebase';
+import { auth, db, IS_MOCK_ENV } from '../services/firebase';
 import type { UserProfile, UserRole } from '../types';
 
 interface AuthContextType {
@@ -240,7 +239,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err: any) {
       console.error(err);
       if (!error) {
+      if (!err.code && err.message) {
+        setError(err.message);
+      } else {
         setError(translateError(err.code || err.message));
+      }
       }
       setLoading(false);
       throw err;
@@ -313,12 +316,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       let finalPhotoURL = photoURL;
 
-      // Si la foto es un Data URL de base64 (imagen cargada localmente), la subimos a Storage
-      if (photoURL.startsWith('data:image/')) {
-        const storageRef = ref(storage, `users/${user.uid}/avatar.jpg`);
-        await uploadString(storageRef, photoURL, 'data_url');
-        finalPhotoURL = await getDownloadURL(storageRef);
-      }
+
 
       // 1. Actualizar perfil nativo de Firebase Auth
       await updateProfile(firebaseUser, {

@@ -114,7 +114,7 @@ export const AppContainer: React.FC = () => {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [allPredictions, setAllPredictions] = useState<Prediction[]>([]);
   const [savingPredictionMatchId, setSavingPredictionMatchId] = useState<string | null>(null);
-  const [savedPredictionMatchId, setSavedPredictionMatchId] = useState<string | null>(null);
+
 
   // Estados específicos para los Participantes
   const [participants, setParticipants] = useState<UserProfile[]>([]);
@@ -582,12 +582,10 @@ export const AppContainer: React.FC = () => {
   const handleSavePrediction = async (matchId: string, homePrediction: number, awayPrediction: number) => {
     if (!user) return;
     setSavingPredictionMatchId(matchId);
-    setSavedPredictionMatchId(null);
     try {
       await saveUserPrediction(user.uid, matchId, homePrediction, awayPrediction);
       
       // Actualizar estado local inmediato
-      setSavedPredictionMatchId(matchId);
       await loadPredictionsAndParticipants();
     } catch (err) {
       console.error('Error guardando predicción:', err);
@@ -744,7 +742,6 @@ export const AppContainer: React.FC = () => {
                   onSavePrediction={handleSavePrediction}
                   onClearPrediction={handleClearPrediction}
                   savingMatchId={savingPredictionMatchId}
-                  savedMatchId={savedPredictionMatchId}
                   user={user}
                   onSealProde={handleSealProde}
                 />

@@ -7,7 +7,6 @@ interface ProdeFormProps {
   onSavePrediction: (matchId: string, homePrediction: number, awayPrediction: number) => Promise<void>;
   onClearPrediction?: (matchId: string) => Promise<void>;
   savingMatchId: string | null;
-  savedMatchId: string | null;
   user: UserProfile | null;
   onSealProde?: () => Promise<void>;
 }
@@ -20,7 +19,6 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
   onSavePrediction,
   onClearPrediction,
   savingMatchId,
-  savedMatchId,
   user,
   onSealProde
 }) => {

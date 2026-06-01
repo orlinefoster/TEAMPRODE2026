@@ -1,18 +1,75 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 6, 27);
+    
+    // Función para verificar si el usuario está autenticado
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    // Función para verificar si el usuario es administrador
+    function isAdmin() {
+      return isAuth() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Límite de tiempo: 11-06-2026 16:00:00 UTC (Inicio del primer partido)
+    function isBeforeTournament() {
+      return request.time.toMillis() < 1775923200000;
+    }
+
+    // Perfiles de usuario
+    match /users/{userId} {
+      allow read: if isAuth();
+      
+      // Al registrarse, el perfil DEBE nacer con 0 puntos y tomar su rol asignado en la whitelist
+      allow create: if (isAuth() && (request.auth.uid == userId) && 
+                        request.resource.data.role == get(/databases/$(database)/documents/whitelist/$(request.auth.token.email)).data.role &&
+                        request.resource.data.points == 0 &&
+                        request.resource.data.exactMatchesCount == 0 &&
+                        request.resource.data.outcomeMatchesCount == 0) 
+                        || isAdmin();
+                    
+      // En actualizaciones, el usuario NO puede tocar sus puntos ni cambiarse el rol
+      allow update: if isAuth() && (request.auth.uid == userId) && 
+                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'points', 'exactMatchesCount', 'outcomeMatchesCount'])) || isAdmin();
+                    
+      allow delete: if isAdmin();
+    }
+    
+    // Whitelist (lista de correos permitidos)
+    match /whitelist/{email} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    // Partidos
+    match /matches/{matchId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    
+    // Predicciones (pronósticos de los usuarios)
+    match /predictions/{predictionId} {
+      allow read: if isAuth();
+      
+      // CREATE: Solo el dueño, antes del mundial, sin inyectar puntos. (El admin no puede crear predicciones para otros)
+      allow create: if isAuth() && (request.auth.uid == request.resource.data.userId) && 
+                    isBeforeTournament() &&
+                    (!('pointsEarned' in request.resource.data)) && 
+                    (!('calculated' in request.resource.data) || request.resource.data.calculated == false);
+                    
+      // UPDATE: 
+      // Opción A (Usuario): Solo el dueño, antes del mundial, sin tocar puntos.
+      // UPDATE: Solo Admin. En cualquier momento, pero SOLO puede tocar 'pointsEarned' y 'calculated'. ¡No puede alterar la predicción! (Los usuarios no pueden editar su predicción una vez guardada)
+      allow update: if isAdmin() && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsEarned', 'calculated']);
+                    
+      // DELETE: Nadie puede borrar predicciones. (Ni el admin, para mantener el historial intacto).
+      allow delete: if false;
     }
   }
 }

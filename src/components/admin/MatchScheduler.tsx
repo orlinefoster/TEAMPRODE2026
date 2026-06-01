@@ -29,7 +29,7 @@ interface MatchSchedulerProps {
   successMessage: string | null;
 }
 
-const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+
 const PHASES = [
   'Fase de grupos',
   'Dieciseisavos de final',
