@@ -9,6 +9,9 @@ interface ProdeFormProps {
   savingMatchId: string | null;
   user: UserProfile | null;
   onSealProde?: () => Promise<void>;
+  tournamentModality?: 'exact' | 'simple';
+  onSaveSimplePrediction?: (matchId: string, outcome: 'home' | 'away' | 'draw') => Promise<void>;
+  isTournamentParticipantCompleted?: boolean;
 }
 
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
@@ -20,7 +23,10 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
   onClearPrediction,
   savingMatchId,
   user,
-  onSealProde
+  onSealProde,
+  tournamentModality = 'exact',
+  onSaveSimplePrediction,
+  isTournamentParticipantCompleted
 }) => {
   const [viewType, setViewType] = useState<'group' | 'date'>('group');
   const [selectedGroup, setSelectedGroup] = useState('A');
@@ -126,8 +132,14 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
   });
 
   const totalMatchesCount = groupStageMatches.length;
-  // Solo contar predicciones de partidos que pertenezcan a la fase de grupos
-  const predictedCount = predictions.filter(p => groupStageMatches.some(m => m.matchId === p.matchId)).length;
+  // Solo contar predicciones de partidos que pertenezcan a la fase de grupos y tengan valor según modalidad
+  const predictedCount = predictions.filter(p => {
+    const isStageMatch = groupStageMatches.some(m => m.matchId === p.matchId);
+    if (!isStageMatch) return false;
+    return tournamentModality === 'simple' 
+      ? p.predictionOutcome !== undefined 
+      : (p.homePrediction !== undefined && p.awayPrediction !== undefined);
+  }).length;
   const isAllPredicted = totalMatchesCount > 0 && predictedCount >= totalMatchesCount;
 
   const handleSealClick = async () => {
@@ -147,7 +159,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
     const matchDate = new Date(match.date);
     const state = inputStates[match.matchId] || { home: '', away: '' };
     const pred = predictions.find((p) => p.matchId === match.matchId);
-    const isLocked = match.status === 'played' || user?.completedProde === true;
+    const isLocked = match.status === 'played' || (isTournamentParticipantCompleted !== undefined ? isTournamentParticipantCompleted === true : user?.completedProde === true);
 
     return (
       <div
@@ -189,89 +201,211 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
         </div>
 
         {/* Controles de Pronóstico */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr auto 1fr',
-          alignItems: 'center',
-          gap: '15px',
-          flex: 1,
-          minWidth: '280px'
-        }}>
-          {/* Equipo Local */}
-          <div style={{ textAlign: 'right', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-            <span style={{ 
-              overflow: 'hidden', 
-              textOverflow: 'ellipsis', 
-              whiteSpace: 'nowrap',
-              maxWidth: '220px' 
-            }} title={match.homeTeam}>
+        {tournamentModality === 'simple' ? (
+          <div style={{
+            display: 'flex',
+            gap: '10px',
+            flex: 1,
+            minWidth: '280px',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            {/* Botón Local */}
+            <button
+              disabled={isLocked || savingMatchId === match.matchId}
+              onClick={async () => onSaveSimplePrediction && await onSaveSimplePrediction(match.matchId, 'home')}
+              className="btn"
+              title={`Ganador: ${match.homeTeam}`}
+              style={{
+                flex: 1,
+                padding: '10px 15px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                transition: 'all 0.25s ease',
+                backgroundColor: pred?.predictionOutcome === 'home'
+                  ? 'rgba(16, 185, 129, 0.2)'
+                  : pred?.predictionOutcome
+                  ? 'rgba(239, 68, 68, 0.08)'
+                  : 'var(--bg-overlay)',
+                border: pred?.predictionOutcome === 'home'
+                  ? '2px solid var(--accent-green)'
+                  : pred?.predictionOutcome
+                  ? '1px solid rgba(239, 68, 68, 0.3)'
+                  : '1px solid var(--border-light)',
+                color: pred?.predictionOutcome === 'home'
+                  ? 'var(--accent-green)'
+                  : pred?.predictionOutcome
+                  ? 'var(--accent-error)'
+                  : 'var(--text-main)',
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                height: '42px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
               {match.homeTeam}
-            </span>
-          </div>
+            </button>
 
-          {/* Inputs de Predicción */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
-            <input
-              type="number"
-              min="0"
-              className="form-input"
-              style={{
-                width: '50px',
-                height: '42px',
-                textAlign: 'center',
-                fontSize: '1.15rem',
-                fontWeight: 700,
-                padding: 0,
-                backgroundColor: isLocked ? 'var(--border-light)' : 'var(--bg-overlay)'
-              }}
-              placeholder="-"
-              value={state.home}
-              onChange={(e) => handleInputChange(match.matchId, 'home', e.target.value)}
-              onBlur={() => handleBlur(match.matchId)}
+            {/* Botón Empate */}
+            <button
               disabled={isLocked || savingMatchId === match.matchId}
-            />
-
-            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>:</span>
-
-            <input
-              type="number"
-              min="0"
-              className="form-input"
+              onClick={async () => onSaveSimplePrediction && await onSaveSimplePrediction(match.matchId, 'draw')}
+              className="btn"
+              title="Empate"
               style={{
-                width: '50px',
-                height: '42px',
-                textAlign: 'center',
-                fontSize: '1.15rem',
+                flex: 1,
+                padding: '10px 15px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
                 fontWeight: 700,
-                padding: 0,
-                backgroundColor: isLocked ? 'var(--border-light)' : 'var(--bg-overlay)'
+                transition: 'all 0.25s ease',
+                backgroundColor: pred?.predictionOutcome === 'draw'
+                  ? 'rgba(212, 163, 89, 0.2)'
+                  : pred?.predictionOutcome
+                  ? 'rgba(239, 68, 68, 0.08)'
+                  : 'var(--bg-overlay)',
+                border: pred?.predictionOutcome === 'draw'
+                  ? '2px solid var(--accent-gold)'
+                  : pred?.predictionOutcome
+                  ? '1px solid rgba(239, 68, 68, 0.3)'
+                  : '1px solid var(--border-light)',
+                color: pred?.predictionOutcome === 'draw'
+                  ? 'var(--accent-gold)'
+                  : pred?.predictionOutcome
+                  ? 'var(--accent-error)'
+                  : 'var(--text-main)',
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                height: '42px'
               }}
-              placeholder="-"
-              value={state.away}
-              onChange={(e) => handleInputChange(match.matchId, 'away', e.target.value)}
-              onBlur={() => handleBlur(match.matchId)}
-              disabled={isLocked || savingMatchId === match.matchId}
-            />
-          </div>
+            >
+              Empate
+            </button>
 
-          <div style={{ textAlign: 'left', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px' }}>
-            <span style={{ 
-              overflow: 'hidden', 
-              textOverflow: 'ellipsis', 
-              whiteSpace: 'nowrap',
-              maxWidth: '220px' 
-            }} title={match.awayTeam}>
+            {/* Botón Visitante */}
+            <button
+              disabled={isLocked || savingMatchId === match.matchId}
+              onClick={async () => onSaveSimplePrediction && await onSaveSimplePrediction(match.matchId, 'away')}
+              className="btn"
+              title={`Ganador: ${match.awayTeam}`}
+              style={{
+                flex: 1,
+                padding: '10px 15px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                transition: 'all 0.25s ease',
+                backgroundColor: pred?.predictionOutcome === 'away'
+                  ? 'rgba(16, 185, 129, 0.2)'
+                  : pred?.predictionOutcome
+                  ? 'rgba(239, 68, 68, 0.08)'
+                  : 'var(--bg-overlay)',
+                border: pred?.predictionOutcome === 'away'
+                  ? '2px solid var(--accent-green)'
+                  : pred?.predictionOutcome
+                  ? '1px solid rgba(239, 68, 68, 0.3)'
+                  : '1px solid var(--border-light)',
+                color: pred?.predictionOutcome === 'away'
+                  ? 'var(--accent-green)'
+                  : pred?.predictionOutcome
+                  ? 'var(--accent-error)'
+                  : 'var(--text-main)',
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                height: '42px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
               {match.awayTeam}
-            </span>
+            </button>
           </div>
-        </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            gap: '15px',
+            flex: 1,
+            minWidth: '280px'
+          }}>
+            {/* Equipo Local */}
+            <div style={{ textAlign: 'right', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+              <span style={{ 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis', 
+                whiteSpace: 'nowrap',
+                maxWidth: '220px' 
+              }} title={match.homeTeam}>
+                {match.homeTeam}
+              </span>
+            </div>
+
+            {/* Inputs de Predicción */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+              <input
+                type="number"
+                min="0"
+                className="form-input"
+                style={{
+                  width: '50px',
+                  height: '42px',
+                  textAlign: 'center',
+                  fontSize: '1.15rem',
+                  fontWeight: 700,
+                  padding: 0,
+                  backgroundColor: isLocked ? 'var(--border-light)' : 'var(--bg-overlay)'
+                }}
+                placeholder="-"
+                value={state.home}
+                onChange={(e) => handleInputChange(match.matchId, 'home', e.target.value)}
+                onBlur={() => handleBlur(match.matchId)}
+                disabled={isLocked || savingMatchId === match.matchId}
+              />
+
+              <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>:</span>
+
+              <input
+                type="number"
+                min="0"
+                className="form-input"
+                style={{
+                  width: '50px',
+                  height: '42px',
+                  textAlign: 'center',
+                  fontSize: '1.15rem',
+                  fontWeight: 700,
+                  padding: 0,
+                  backgroundColor: isLocked ? 'var(--border-light)' : 'var(--bg-overlay)'
+                }}
+                placeholder="-"
+                value={state.away}
+                onChange={(e) => handleInputChange(match.matchId, 'away', e.target.value)}
+                onBlur={() => handleBlur(match.matchId)}
+                disabled={isLocked || savingMatchId === match.matchId}
+              />
+            </div>
+
+            <div style={{ textAlign: 'left', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px' }}>
+              <span style={{ 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis', 
+                whiteSpace: 'nowrap',
+                maxWidth: '220px' 
+              }} title={match.awayTeam}>
+                {match.awayTeam}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Status de Guardado / Aciertos */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', width: '130px', flexShrink: 0 }}>
           {savingMatchId === match.matchId && (
             <span style={{ fontSize: '0.8rem', color: 'var(--accent-gold)' }}>💾 Guardando...</span>
           )}
-          {pred && pred.homePrediction !== undefined && savingMatchId !== match.matchId && (
+          {pred && (pred.predictionOutcome !== undefined || pred.homePrediction !== undefined) && savingMatchId !== match.matchId && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--accent-green)', fontWeight: 600 }}>✅ Guardado</span>
               {!isLocked && (
@@ -334,7 +468,9 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
               fontWeight: 700,
               fontSize: '0.8rem'
             }}>
-              {pred.pointsEarned === 3 ? 'Exacto (+3)' : pred.pointsEarned === 1 ? 'Acierto (+1)' : '0 pts'}
+              {tournamentModality === 'simple'
+                ? (pred.pointsEarned === 1 ? 'Acierto (+1)' : '0 pts')
+                : (pred.pointsEarned === 3 ? 'Exacto (+3)' : pred.pointsEarned === 1 ? 'Acierto (+1)' : '0 pts')}
             </div>
           )}
 
@@ -350,7 +486,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
       
       {/* Banner de Sellar Prode */}
-      {isAllPredicted && !user?.completedProde && (
+      {isAllPredicted && !(isTournamentParticipantCompleted !== undefined ? isTournamentParticipantCompleted : user?.completedProde) && (
         <div className="glass-panel animate-fade-in" style={{
           padding: '25px',
           border: '2px solid var(--accent-gold)',
@@ -396,7 +532,7 @@ export const ProdeForm: React.FC<ProdeFormProps> = ({
         </div>
       )}
 
-      {user?.completedProde && (
+      {(isTournamentParticipantCompleted !== undefined ? isTournamentParticipantCompleted : user?.completedProde) && (
         <div className="glass-panel" style={{
           padding: '15px 25px',
           border: '1px solid var(--accent-green)',

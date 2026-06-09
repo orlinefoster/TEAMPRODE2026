@@ -7,13 +7,17 @@ interface NavbarProps {
   activePage: string;
   onNavigate: (page: string) => void;
   onLogout: () => void;
+  activeTournamentName?: string;
+  activeTournamentPoints?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   user,
   activePage,
   onNavigate,
-  onLogout
+  onLogout,
+  activeTournamentName,
+  activeTournamentPoints
 }) => {
   return (
     <nav style={{ 
@@ -31,33 +35,50 @@ export const Navbar: React.FC<NavbarProps> = ({
         justifyContent: 'space-between'
       }}>
         {/* Logo */}
-        <div 
-          onClick={() => onNavigate('prode')} 
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
-        >
-          <span style={{ fontSize: '1.5rem' }}>🏆</span>
-          <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
-            TEAM<span style={{ color: 'var(--accent-gold)' }}>PRODE</span>
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div 
+            onClick={() => onNavigate('prode')} 
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+          >
+            <span style={{ fontSize: '1.5rem' }}>🏆</span>
+            <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+              TEAM<span style={{ color: 'var(--accent-gold)' }}>PRODE</span>
+            </span>
+          </div>
+          {activeTournamentName && (
+            <span className="mobile-hide" style={{ 
+              fontSize: '0.75rem', 
+              backgroundColor: 'var(--bg-overlay)', 
+              color: 'var(--accent-gold)', 
+              padding: '4px 10px', 
+              borderRadius: '20px', 
+              fontWeight: 600,
+              border: '1px solid var(--border-light)'
+            }}>
+              🏆 {activeTournamentName}
+            </span>
+          )}
         </div>
 
         {/* Links de Navegación */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <button 
-            onClick={() => onNavigate('prode')} 
-            style={{ 
-              fontWeight: 600, 
-              fontSize: '0.95rem',
-              color: activePage === 'prode' ? 'var(--accent-gold)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              transition: 'color 0.2s',
-              backgroundColor: activePage === 'prode' ? 'var(--bg-overlay)' : 'transparent'
-            }}
-          >
-            Mi Prode
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          {user.role !== 'admin' && (
+            <button 
+              onClick={() => onNavigate('prode')} 
+              style={{ 
+                fontWeight: 600, 
+                fontSize: '0.95rem',
+                color: activePage === 'prode' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                transition: 'color 0.2s',
+                backgroundColor: activePage === 'prode' ? 'var(--bg-overlay)' : 'transparent'
+              }}
+            >
+              Mi Prode
+            </button>
+          )}
           
           <button 
             onClick={() => onNavigate('calendar')} 
@@ -93,6 +114,24 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {user.role === 'admin' && (
             <button 
+              onClick={() => onNavigate('tournaments')} 
+              style={{ 
+                fontWeight: 600, 
+                fontSize: '0.95rem',
+                color: activePage === 'tournaments' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                transition: 'color 0.2s',
+                backgroundColor: activePage === 'tournaments' ? 'var(--bg-overlay)' : 'transparent'
+              }}
+            >
+              Torneos
+            </button>
+          )}
+
+          {user.role === 'admin' && (
+            <button 
               onClick={() => onNavigate('whitelist')} 
               style={{ 
                 fontWeight: 600, 
@@ -113,8 +152,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Usuario y Logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <div 
-            onClick={() => onNavigate('profile')} 
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+            onClick={() => user.role !== 'admin' && onNavigate('profile')} 
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: user.role === 'admin' ? 'default' : 'pointer' }}
           >
             <img 
               src={user.photoURL} 
@@ -132,7 +171,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {user.displayName}
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold)', fontWeight: 500 }}>
-                {user.points} pts
+                {activeTournamentPoints !== undefined ? activeTournamentPoints : user.points} pts
               </span>
             </div>
           </div>

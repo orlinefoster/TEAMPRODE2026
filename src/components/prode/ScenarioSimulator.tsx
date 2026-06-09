@@ -67,8 +67,8 @@ export const ScenarioSimulator: React.FC<ScenarioSimulatorProps> = ({
         // Si el partido simulado tiene marcador (real o ficticio), calculamos puntos
         if (simMatch && simMatch.status === 'played' && simMatch.homeScore !== undefined && simMatch.awayScore !== undefined) {
           const res = calculatePoints(
-            pred.homePrediction, 
-            pred.awayPrediction, 
+            pred.homePrediction ?? 0, 
+            pred.awayPrediction ?? 0, 
             simMatch.homeScore, 
             simMatch.awayScore
           );

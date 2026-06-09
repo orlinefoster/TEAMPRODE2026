@@ -91,7 +91,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
           // Buscar predicción del usuario para este partido específico
           const pred = predictions.find(p => p.userId === user.uid && p.matchId === match.matchId);
           if (pred && match.homeScore !== undefined && match.awayScore !== undefined) {
-            const res = calculatePoints(pred.homePrediction, pred.awayPrediction, match.homeScore, match.awayScore);
+            const res = calculatePoints(pred.homePrediction ?? 0, pred.awayPrediction ?? 0, match.homeScore, match.awayScore);
             userPointsAccumulator[user.uid] += res.points;
           }
           // Limpiar nombre quitando emoji y recortar a primer nombre para legibilidad

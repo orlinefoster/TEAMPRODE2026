@@ -36,6 +36,26 @@ export const calculatePoints = (
 };
 
 /**
+ * Calcula los puntos ganados para una predicción simple (ganador/empate) contra un resultado real.
+ * acierto: 1 pt
+ * desacierto: 0 pts
+ */
+export const calculatePointsSimple = (
+  predictionOutcome: 'home' | 'away' | 'draw',
+  homeActual: number,
+  awayActual: number
+): ScoringResult => {
+  const actualOutcome = homeActual > awayActual ? 'home' : homeActual < awayActual ? 'away' : 'draw';
+
+  if (predictionOutcome === actualOutcome) {
+    return { points: 1, type: 'outcome' };
+  }
+
+  return { points: 0, type: 'none' };
+};
+
+
+/**
  * Calcula y genera la tabla de posiciones (Leaderboard) ordenando a los usuarios.
  * Ordena por:
  * 1. Puntos totales (descendente)
