@@ -2,74 +2,176 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // Función para verificar si el usuario está autenticado
     function isAuth() {
       return request.auth != null;
     }
-    
+
     // Función para verificar si el usuario es administrador
     function isAdmin() {
       return isAuth() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Límite de tiempo: 11-06-2026 16:00:00 UTC (Inicio del primer partido)
+    // Límite de tiempo: 11-06-2026 (ONCE DE JUNIO DE 2026) 16:00:00 UTC (Inicio del primer partido)
     function isBeforeTournament() {
-      return request.time.toMillis() < 1775923200000;
+      return request.time.toMillis() < 1781193600000;
     }
 
     // Perfiles de usuario
     match /users/{userId} {
-      allow read: if isAuth();
-      
+      // Cada usuario solo puede leer su propio perfil. Admin puede leer todos.
+      allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+
       // Al registrarse, el perfil DEBE nacer con 0 puntos y tomar su rol asignado en la whitelist
       allow create: if (isAuth() && (request.auth.uid == userId) && 
-                        request.resource.data.role == get(/databases/$(database)/documents/whitelist/$(request.auth.token.email)).data.role &&
-                        request.resource.data.points == 0 &&
-                        request.resource.data.exactMatchesCount == 0 &&
-                        request.resource.data.outcomeMatchesCount == 0) 
-                        || isAdmin();
-                    
+      request.resource.data.role == get(/databases/$(database)/documents/whitelist/$(request.resource.data.email)).data.role &&
+      request.resource.data.points == 0 &&
+      request.resource.data.exactMatchesCount == 0 &&
+      request.resource.data.outcomeMatchesCount == 0) 
+        || isAdmin();
+
       // En actualizaciones, el usuario NO puede tocar sus puntos ni cambiarse el rol
-      allow update: if isAuth() && (request.auth.uid == userId) && 
-                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'points', 'exactMatchesCount', 'outcomeMatchesCount'])) || isAdmin();
-                    
+      allow update: if (isAuth() && (request.auth.uid == userId) && 
+      (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'points', 'exactMatchesCount', 'outcomeMatchesCount']))) || isAdmin();
+
       allow delete: if isAdmin();
     }
-    
+
     // Whitelist (lista de correos permitidos)
     match /whitelist/{email} {
-      allow get: if true;
+      allow get: if isAuth();
       allow list: if isAdmin();
-      allow write: if isAdmin();
+      allow create: if isAdmin() || (
+      isAuth() && 
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee' &&
+      request.resource.data.role == 'user'
+      );
+      allow update, delete: if isAdmin();
     }
-    
+
     // Partidos
     match /matches/{matchId} {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
-    
+
     // Predicciones (pronósticos de los usuarios)
     match /predictions/{predictionId} {
       allow read: if isAuth();
-      
+
       // CREATE: Solo el dueño, antes del mundial, sin inyectar puntos. (El admin no puede crear predicciones para otros)
       allow create: if isAuth() && (request.auth.uid == request.resource.data.userId) && 
-                    isBeforeTournament() &&
-                    (!('pointsEarned' in request.resource.data)) && 
-                    (!('calculated' in request.resource.data) || request.resource.data.calculated == false);
-                    
+      isBeforeTournament() &&
+      (!('pointsEarned' in request.resource.data)) && 
+      (!('calculated' in request.resource.data) || request.resource.data.calculated == false);
+
       // UPDATE: 
-      // Opción A (Usuario): Solo el dueño, antes del mundial, sin tocar puntos.
-      // UPDATE: Solo Admin. En cualquier momento, pero SOLO puede tocar 'pointsEarned' y 'calculated'. ¡No puede alterar la predicción! (Los usuarios no pueden editar su predicción una vez guardada)
-      allow update: if isAdmin() && 
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsEarned', 'calculated']);
-                    
-      // DELETE: Nadie puede borrar predicciones. (Ni el admin, para mantener el historial intacto).
-      allow delete: if false;
+      // 1. El dueño puede actualizar su predicción antes del mundial, sin tocar puntos.
+      // 2. El admin puede actualizar 'pointsEarned' y 'calculated' para cualquier predicción en cualquier momento.
+      allow update: if (
+      isAuth() && 
+      (request.auth.uid == resource.data.userId) &&
+      (request.auth.uid == request.resource.data.userId) &&
+      isBeforeTournament() &&
+      (!('pointsEarned' in request.resource.data) || request.resource.data.pointsEarned == resource.data.pointsEarned) &&
+      (!('calculated' in request.resource.data) || request.resource.data.calculated == false || request.resource.data.calculated == resource.data.calculated)
+      ) || (
+      isAdmin() && 
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsEarned', 'calculated'])
+      );
+
+      // DELETE: Solo el dueño puede borrar su predicción antes del mundial.
+      allow delete: if isAuth() && (request.auth.uid == resource.data.userId) && isBeforeTournament();
+    }
+
+    // Torneos personalizados paralelos
+    match /tournaments/{tournamentId} {
+      // Leer torneo: admin ve todo (list+get). Referee dueño y participantes solo get individual.
+      allow get: if isAdmin() || 
+        (isAuth() && resource.data.refereeId == request.auth.uid) ||
+        (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
+      allow list: if isAdmin();
+
+      // Permitir crear si está autenticado y es admin o referee
+      allow create: if isAuth() && 
+      request.resource.data.refereeId == request.auth.uid &&
+      (
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee' ||
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+
+      // Permitir actualizar / borrar si es árbitro o admin global
+      allow update, delete: if isAdmin() || (isAuth() && resource.data.refereeId == request.auth.uid);
+
+      // Lista de correos autorizados para el torneo (whitelist)
+      match /whitelist/{email} {
+        allow get: if isAuth();
+        allow list, write: if isAdmin() || 
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
+      }
+
+      // Participantes del torneo
+      match /participants/{userId} {
+        // Leer participantes: admin, referee dueño, o participante del torneo
+        allow read: if isAdmin() || 
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
+
+        // Crear participante: si el usuario mismo se une (y está en la whitelist o es árbitro/admin), o si lo agrega el árbitro/admin
+        allow create: if (isAuth() && request.auth.uid == userId && 
+        (exists(/databases/$(database)/documents/tournaments/$(tournamentId)/whitelist/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email)) ||
+        get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid)) ||
+        isAdmin() || 
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
+
+        // Actualizar participante:
+        // El árbitro o admin puede actualizar puntos y counts; el usuario mismo puede actualizar campos básicos sin alterar puntos
+        allow update: if isAdmin() || 
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        (isAuth() && request.auth.uid == userId && 
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['points', 'exactMatchesCount', 'outcomeMatchesCount'])));
+
+        allow delete: if isAdmin() || 
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
+      }
+
+      // Predicciones del torneo — visibles para participantes del mismo torneo, referee dueño y admin
+      match /predictions/{predictionId} {
+        allow read: if isAdmin() || 
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
+
+        // CREATE: solo el dueño, antes del mundial
+        allow create: if isAuth() && 
+        request.auth.uid == request.resource.data.userId &&
+        isBeforeTournament() &&
+        (!('pointsEarned' in request.resource.data)) && 
+        (!('calculated' in request.resource.data) || request.resource.data.calculated == false);
+
+        // UPDATE:
+        // 1. El dueño puede actualizar antes del mundial (sin cambiar puntos)
+        // 2. El admin o árbitro del torneo puede actualizar puntos
+        allow update: if (
+        isAuth() && 
+        request.auth.uid == resource.data.userId &&
+        request.auth.uid == request.resource.data.userId &&
+        isBeforeTournament() &&
+        (!('pointsEarned' in request.resource.data) || request.resource.data.pointsEarned == resource.data.pointsEarned) &&
+        (!('calculated' in request.resource.data) || request.resource.data.calculated == false || request.resource.data.calculated == resource.data.calculated)
+        ) || (
+        isAdmin() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsEarned', 'calculated'])
+        ) || (
+        isAuth() && 
+        get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsEarned', 'calculated'])
+        );
+
+        allow delete: if isAuth() && request.auth.uid == resource.data.userId && isBeforeTournament();
+      }
     }
   }
 }

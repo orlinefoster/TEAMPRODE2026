@@ -13,8 +13,8 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { db, IS_MOCK_ENV } from './firebase';
-import type { Match, Prediction, UserProfile } from '../types';
-import { calculatePoints } from './scoringEngine';
+import type { Match, Prediction, UserProfile, Tournament, TournamentParticipant, UserRole } from '../types';
+import { calculatePoints, calculatePointsSimple } from './scoringEngine';
 import partidosRaw from '../../partidos.json';
 import otherFaseRaw from '../../other-fase.json';
 
@@ -169,7 +169,7 @@ export const updateMatchResultInDB = async (
     // Actualizar predicciones para este partido
     predictions.forEach((pred) => {
       if (pred.matchId === matchId) {
-        const res = calculatePoints(pred.homePrediction, pred.awayPrediction, homeScore, awayScore);
+        const res = calculatePoints(pred.homePrediction ?? 0, pred.awayPrediction ?? 0, homeScore, awayScore);
         pred.pointsEarned = res.points;
         pred.calculated = true;
       }
@@ -200,6 +200,7 @@ export const updateMatchResultInDB = async (
     });
 
     localStorage.setItem('prode_users', JSON.stringify(users));
+    await recalculateCustomTournamentsForMatch(matchId, homeScore, awayScore, false);
     console.log('🔄 Recalculation & Bracket Advance: Resultados, avances y puntuaciones actualizados en LocalStorage (Mock).');
     return;
   }
@@ -261,7 +262,7 @@ export const updateMatchResultInDB = async (
 
     predsSnapshot.forEach((predDocSnap) => {
       const pred = predDocSnap.data() as Prediction;
-      const res = calculatePoints(pred.homePrediction, pred.awayPrediction, homeScore, awayScore);
+      const res = calculatePoints(pred.homePrediction ?? 0, pred.awayPrediction ?? 0, homeScore, awayScore);
       
       const predDocRef = doc(db, 'predictions', predDocSnap.id);
       batch.update(predDocRef, {
@@ -304,6 +305,7 @@ export const updateMatchResultInDB = async (
     }
 
     await secondBatch.commit();
+    await recalculateCustomTournamentsForMatch(matchId, homeScore, awayScore, false);
     console.log('🔄 Recalculation & Bracket Advance: Puntajes, estadísticas y brackets recalculados con éxito.');
   } catch (err) {
     console.error('Error actualizando resultados y recalculando puntos/brackets:', err);
@@ -365,6 +367,7 @@ export const deleteMatchResultInDB = async (matchId: string): Promise<void> => {
     });
 
     localStorage.setItem('prode_users', JSON.stringify(users));
+    await recalculateCustomTournamentsForMatch(matchId, undefined, undefined, true);
     console.log('🔄 Recalculation: Resultado del partido eliminado con éxito en LocalStorage (Mock).');
     return;
   }
@@ -429,6 +432,7 @@ export const deleteMatchResultInDB = async (matchId: string): Promise<void> => {
     }
 
     await secondBatch.commit();
+    await recalculateCustomTournamentsForMatch(matchId, undefined, undefined, true);
     console.log('🔄 Recalculation: Resultado del partido eliminado con éxito en Firestore.');
   } catch (err) {
     console.error('Error al eliminar resultado de partido:', err);
@@ -1412,5 +1416,1239 @@ export const clearAllGhostsPredictionsInDB = async (): Promise<void> => {
     throw err;
   }
 };
+
+/**
+ * Recalcula las puntuaciones de todos los torneos personalizados para un partido específico.
+ */
+export const recalculateCustomTournamentsForMatch = async (
+  matchId: string,
+  homeScore?: number,
+  awayScore?: number,
+  isDelete: boolean = false
+): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    const tourneysJson = localStorage.getItem('prode_tournaments') || '[]';
+    const tourneys: Tournament[] = JSON.parse(tourneysJson);
+
+    const predsJson = localStorage.getItem('prode_tournament_predictions') || '[]';
+    const predictions = JSON.parse(predsJson);
+
+    const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+    const participants = JSON.parse(partsJson);
+
+    tourneys.forEach((t) => {
+      const tournamentPreds = predictions.filter((p: any) => p.tournamentId === t.id && p.prediction.matchId === matchId);
+
+      tournamentPreds.forEach((item: any) => {
+        const pred = item.prediction;
+        if (isDelete) {
+          delete pred.pointsEarned;
+          pred.calculated = false;
+        } else if (homeScore !== undefined && awayScore !== undefined) {
+          if (t.modality === 'simple') {
+            if (pred.predictionOutcome) {
+              const res = calculatePointsSimple(pred.predictionOutcome, homeScore, awayScore);
+              pred.pointsEarned = res.points;
+              pred.calculated = true;
+            }
+          } else {
+            if (pred.homePrediction !== undefined && pred.awayPrediction !== undefined) {
+              const res = calculatePoints(pred.homePrediction, pred.awayPrediction, homeScore, awayScore);
+              pred.pointsEarned = res.points;
+              pred.calculated = true;
+            }
+          }
+        }
+      });
+
+      const tournamentParticipants = participants.filter((p: any) => p.tournamentId === t.id);
+      tournamentParticipants.forEach((pItem: any) => {
+        const part = pItem.participant;
+        const userPreds = predictions
+          .filter((p: any) => p.tournamentId === t.id && p.prediction.userId === part.uid)
+          .map((p: any) => p.prediction);
+
+        let totalPoints = 0;
+        let exactCount = 0;
+        let outcomeCount = 0;
+
+        userPreds.forEach((pred: any) => {
+          if (pred.calculated && pred.pointsEarned !== undefined) {
+            totalPoints += pred.pointsEarned;
+            if (t.modality === 'simple') {
+              if (pred.pointsEarned === 1) outcomeCount++;
+            } else {
+              if (pred.pointsEarned === 3) exactCount++;
+              if (pred.pointsEarned === 1) outcomeCount++;
+            }
+          }
+        });
+
+        part.points = totalPoints;
+        part.exactMatchesCount = exactCount;
+        part.outcomeMatchesCount = outcomeCount;
+      });
+    });
+
+    localStorage.setItem('prode_tournament_predictions', JSON.stringify(predictions));
+    localStorage.setItem('prode_tournament_participants', JSON.stringify(participants));
+    console.log('🔄 Recalculation: Torneos personalizados actualizados en LocalStorage (Mock).');
+    return;
+  }
+
+  try {
+    const tournamentsSnap = await getDocs(collection(db, 'tournaments'));
+
+    for (const tDoc of tournamentsSnap.docs) {
+      const t = tDoc.data() as Tournament;
+      const predsColl = collection(db, 'tournaments', t.id, 'predictions');
+
+      const predsQuery = query(predsColl, where('matchId', '==', matchId));
+      const predsSnap = await getDocs(predsQuery);
+
+      const affectedUsers = new Set<string>();
+      let batch = writeBatch(db);
+      let count = 0;
+
+      for (const predDocSnap of predsSnap.docs) {
+        const pred = predDocSnap.data() as Prediction;
+        affectedUsers.add(pred.userId);
+
+        if (isDelete) {
+          batch.update(predDocSnap.ref, {
+            pointsEarned: deleteField(),
+            calculated: false
+          });
+        } else if (homeScore !== undefined && awayScore !== undefined) {
+          let points = 0;
+          if (t.modality === 'simple') {
+            if (pred.predictionOutcome) {
+              const res = calculatePointsSimple(pred.predictionOutcome, homeScore, awayScore);
+              points = res.points;
+            }
+          } else {
+            if (pred.homePrediction !== undefined && pred.awayPrediction !== undefined) {
+              const res = calculatePoints(pred.homePrediction, pred.awayPrediction, homeScore, awayScore);
+              points = res.points;
+            }
+          }
+
+          batch.update(predDocSnap.ref, {
+            pointsEarned: points,
+            calculated: true
+          });
+        }
+
+        count++;
+        if (count >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+
+      if (count > 0) {
+        await batch.commit();
+      }
+
+      if (affectedUsers.size > 0) {
+        let secondBatch = writeBatch(db);
+        let secondCount = 0;
+
+        for (const userId of affectedUsers) {
+          const userPredsQuery = query(predsColl, where('userId', '==', userId));
+          const userPredsSnapshot = await getDocs(userPredsQuery);
+
+          let totalPoints = 0;
+          let exactCount = 0;
+          let outcomeCount = 0;
+
+          userPredsSnapshot.forEach((predDocSnap) => {
+            const pred = predDocSnap.data() as Prediction;
+            if (pred.calculated && pred.pointsEarned !== undefined) {
+              totalPoints += pred.pointsEarned;
+              if (t.modality === 'simple') {
+                if (pred.pointsEarned === 1) outcomeCount++;
+              } else {
+                if (pred.pointsEarned === 3) exactCount++;
+                if (pred.pointsEarned === 1) outcomeCount++;
+              }
+            }
+          });
+
+          const participantRef = doc(db, 'tournaments', t.id, 'participants', userId);
+          secondBatch.update(participantRef, {
+            points: totalPoints,
+            exactMatchesCount: exactCount,
+            outcomeMatchesCount: outcomeCount
+          });
+
+          secondCount++;
+          if (secondCount >= 400) {
+            await secondBatch.commit();
+            secondBatch = writeBatch(db);
+            secondCount = 0;
+          }
+        }
+
+        if (secondCount > 0) {
+          await secondBatch.commit();
+        }
+      }
+    }
+    console.log('🔄 Recalculation: Torneos personalizados recalculados exitosamente en Firestore.');
+  } catch (err) {
+    console.error('Error al recalcular torneos personalizados:', err);
+    throw err;
+  }
+};
+
+/**
+ * Crea un nuevo torneo paralelo
+ */
+export const createTournamentInDB = async (
+  name: string,
+  modality: 'exact' | 'simple',
+  creator: UserProfile
+): Promise<Tournament> => {
+  const tournamentId = `t_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  const newTournament: Tournament = {
+    id: tournamentId,
+    name,
+    modality,
+    refereeId: creator.uid,
+    createdAt: Date.now()
+  };
+
+  if (IS_MOCK_ENV) {
+    const tourneysJson = localStorage.getItem('prode_tournaments') || '[]';
+    const tourneys: Tournament[] = JSON.parse(tourneysJson);
+    tourneys.push(newTournament);
+    localStorage.setItem('prode_tournaments', JSON.stringify(tourneys));
+
+    const participant: TournamentParticipant = {
+      uid: creator.uid,
+      email: creator.email,
+      displayName: creator.displayName,
+      photoURL: creator.photoURL,
+      points: 0,
+      exactMatchesCount: 0,
+      outcomeMatchesCount: 0,
+      completedProde: false,
+      joinedAt: Date.now()
+    };
+    const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+    const participants = JSON.parse(partsJson);
+    participants.push({ tournamentId, participant });
+    localStorage.setItem('prode_tournament_participants', JSON.stringify(participants));
+
+    console.log(`🏆 Mock: Torneo ${name} creado con éxito.`);
+    return newTournament;
+  }
+
+  try {
+    const tournamentRef = doc(db, 'tournaments', tournamentId);
+    await setDoc(tournamentRef, newTournament);
+
+    const participantRef = doc(db, 'tournaments', tournamentId, 'participants', creator.uid);
+    const participant: TournamentParticipant = {
+      uid: creator.uid,
+      email: creator.email,
+      displayName: creator.displayName,
+      photoURL: creator.photoURL,
+      points: 0,
+      exactMatchesCount: 0,
+      outcomeMatchesCount: 0,
+      completedProde: false,
+      joinedAt: Date.now()
+    };
+    await setDoc(participantRef, participant);
+
+    console.log(`🏆 DB: Torneo ${name} creado con éxito en Firestore.`);
+    return newTournament;
+  } catch (err) {
+    console.error('Error al crear torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Agrega un correo a la whitelist de un torneo.
+ * Si el usuario ya está registrado en la app, lo une inmediatamente como participante.
+ */
+export const inviteUserToTournamentInDB = async (
+  tournamentId: string,
+  emailToAdd: string,
+  refereeId: string | null = null
+): Promise<void> => {
+  const emailSanitized = emailToAdd.trim().toLowerCase();
+
+  if (IS_MOCK_ENV) {
+    const wlJson = localStorage.getItem('prode_tournament_whitelist') || '[]';
+    const wl = JSON.parse(wlJson);
+    if (!wl.some((entry: any) => entry.tournamentId === tournamentId && entry.email === emailSanitized)) {
+      wl.push({ tournamentId, email: emailSanitized });
+      localStorage.setItem('prode_tournament_whitelist', JSON.stringify(wl));
+    }
+
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+    const userToJoin = users.find(u => u.email.trim().toLowerCase() === emailSanitized);
+
+    if (userToJoin) {
+      const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+      const participants = JSON.parse(partsJson);
+      const isAlreadyParticipant = participants.some((p: any) => p.tournamentId === tournamentId && p.participant.uid === userToJoin.uid);
+      
+      if (!isAlreadyParticipant) {
+        const participant: TournamentParticipant = {
+          uid: userToJoin.uid,
+          email: userToJoin.email,
+          displayName: userToJoin.displayName,
+          photoURL: userToJoin.photoURL,
+          points: 0,
+          exactMatchesCount: 0,
+          outcomeMatchesCount: 0,
+          completedProde: false,
+          joinedAt: Date.now()
+        };
+        participants.push({ tournamentId, participant });
+        localStorage.setItem('prode_tournament_participants', JSON.stringify(participants));
+      }
+    }
+    return;
+  }
+
+  try {
+    const globalWlRef = doc(db, 'whitelist', emailSanitized);
+    const globalWlSnap = await getDoc(globalWlRef);
+
+    const batch = writeBatch(db);
+
+    // 1. Crear documento de whitelist en el torneo
+    const wlRef = doc(db, 'tournaments', tournamentId, 'whitelist', emailSanitized);
+    batch.set(wlRef, {
+      email: emailSanitized,
+      invitedAt: Date.now()
+    });
+
+    // 2. Auto-crear/set en la whitelist global con rol 'user' si no existe
+    if (!globalWlSnap.exists()) {
+      batch.set(globalWlRef, {
+        email: emailSanitized,
+        role: 'user',
+        addedBy: refereeId || 'referee',
+        createdAt: serverTimestamp(),
+        tournamentId: tournamentId
+      });
+    } else {
+      const data = globalWlSnap.data();
+      if (!data?.tournamentId) {
+        batch.update(globalWlRef, {
+          tournamentId: tournamentId
+        });
+      }
+    }
+
+    await batch.commit();
+
+    // 3. Si el usuario ya está registrado, unirlo al torneo inmediatamente
+    const usersQuery = query(collection(db, 'users'), where('email', '==', emailSanitized));
+    const querySnapshot = await getDocs(usersQuery);
+
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data() as UserProfile;
+
+      const participantRef = doc(db, 'tournaments', tournamentId, 'participants', userData.uid);
+      const participant: TournamentParticipant = {
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName,
+        photoURL: userData.photoURL,
+        points: 0,
+        exactMatchesCount: 0,
+        outcomeMatchesCount: 0,
+        completedProde: false,
+        joinedAt: Date.now()
+      };
+      await setDoc(participantRef, participant);
+    }
+  } catch (err) {
+    console.error('Error al invitar al usuario al torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Mueve un correo electrónico autorizado de la whitelist de un torneo a otro (o global).
+ * También maneja la migración de la participación del usuario si ya está registrado.
+ */
+export const moveWhitelistEntryInDB = async (
+  email: string,
+  fromTournamentId: string | null,
+  toTournamentId: string | null,
+  role: UserRole = 'user'
+): Promise<void> => {
+  const emailSanitized = email.trim().toLowerCase();
+
+  if (IS_MOCK_ENV) {
+    // 1. Quitar de la lista vieja
+    if (fromTournamentId) {
+      const wlJson = localStorage.getItem('prode_tournament_whitelist') || '[]';
+      let wl = JSON.parse(wlJson);
+      wl = wl.filter((w: any) => !(w.tournamentId === fromTournamentId && w.email === emailSanitized));
+      localStorage.setItem('prode_tournament_whitelist', JSON.stringify(wl));
+      
+      // Quitar participante mock viejo
+      const usersJson = localStorage.getItem('prode_users') || '[]';
+      const users: UserProfile[] = JSON.parse(usersJson);
+      const userObj = users.find(u => u.email.trim().toLowerCase() === emailSanitized);
+      if (userObj) {
+        const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+        let participants = JSON.parse(partsJson);
+        participants = participants.filter((p: any) => !(p.tournamentId === fromTournamentId && p.participant.uid === userObj.uid));
+        localStorage.setItem('prode_tournament_participants', JSON.stringify(participants));
+      }
+    }
+
+    // 2. Agregar a la nueva lista
+    if (toTournamentId) {
+      const wlJson = localStorage.getItem('prode_tournament_whitelist') || '[]';
+      const wl = JSON.parse(wlJson);
+      if (!wl.some((entry: any) => entry.tournamentId === toTournamentId && entry.email === emailSanitized)) {
+        wl.push({ tournamentId: toTournamentId, email: emailSanitized });
+        localStorage.setItem('prode_tournament_whitelist', JSON.stringify(wl));
+      }
+
+      // Añadir participante mock nuevo si el usuario ya existe
+      const usersJson = localStorage.getItem('prode_users') || '[]';
+      const users: UserProfile[] = JSON.parse(usersJson);
+      const userObj = users.find(u => u.email.trim().toLowerCase() === emailSanitized);
+      if (userObj) {
+        const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+        const participants = JSON.parse(partsJson);
+        const isAlreadyParticipant = participants.some((p: any) => p.tournamentId === toTournamentId && p.participant.uid === userObj.uid);
+        if (!isAlreadyParticipant) {
+          const participant: TournamentParticipant = {
+            uid: userObj.uid,
+            email: userObj.email,
+            displayName: userObj.displayName,
+            photoURL: userObj.photoURL,
+            points: 0,
+            exactMatchesCount: 0,
+            outcomeMatchesCount: 0,
+            completedProde: false,
+            joinedAt: Date.now()
+          };
+          participants.push({ tournamentId: toTournamentId, participant });
+          localStorage.setItem('prode_tournament_participants', JSON.stringify(participants));
+        }
+      }
+    } else {
+      console.log(`Mock: Email ${emailSanitized} movido a Whitelist Global.`);
+    }
+    return;
+  }
+
+  try {
+    const batch = writeBatch(db);
+
+    // 1. Eliminar whitelist vieja (solo si no es la global)
+    if (fromTournamentId) {
+      const oldWlRef = doc(db, 'tournaments', fromTournamentId, 'whitelist', emailSanitized);
+      batch.delete(oldWlRef);
+    }
+
+    // 2. Crear whitelist nueva
+    if (toTournamentId) {
+      const newWlRef = doc(db, 'tournaments', toTournamentId, 'whitelist', emailSanitized);
+      batch.set(newWlRef, {
+        email: emailSanitized,
+        addedBy: 'admin',
+        createdAt: serverTimestamp(),
+        role: 'user'
+      });
+
+      // Asegurar que exista en la whitelist global (con merge para no pisar rol si ya existe)
+      const globalWlRef = doc(db, 'whitelist', emailSanitized);
+      batch.set(globalWlRef, {
+        email: emailSanitized,
+        addedBy: 'admin',
+        createdAt: serverTimestamp(),
+        role: role || 'user',
+        tournamentId: toTournamentId
+      }, { merge: true });
+    } else {
+      // Si se mueve de vuelta a la whitelist Global
+      const globalWlRef = doc(db, 'whitelist', emailSanitized);
+      batch.set(globalWlRef, {
+        email: emailSanitized,
+        addedBy: 'admin',
+        createdAt: serverTimestamp(),
+        role: role,
+        tournamentId: null
+      }, { merge: true });
+    }
+
+    // 3. Si el usuario ya está registrado, mover su participante y borrar predicciones viejas
+    const usersQuery = query(collection(db, 'users'), where('email', '==', emailSanitized));
+    const usersSnap = await getDocs(usersQuery);
+
+    if (!usersSnap.empty) {
+      const userData = usersSnap.docs[0].data() as UserProfile;
+      const userRef = doc(db, 'users', userData.uid);
+
+      // Actualizar el torneo asignado en el perfil del usuario
+      batch.update(userRef, {
+        tournamentId: toTournamentId
+      });
+
+      // Borrar participante y predicciones del torneo viejo
+      if (fromTournamentId) {
+        batch.delete(doc(db, 'tournaments', fromTournamentId, 'participants', userData.uid));
+
+        const predsSnap = await getDocs(
+          query(collection(db, 'tournaments', fromTournamentId, 'predictions'), where('userId', '==', userData.uid))
+        );
+        predsSnap.forEach((d) => {
+          batch.delete(d.ref);
+        });
+      }
+
+      // Crear participante en el torneo nuevo
+      if (toTournamentId) {
+        const participantRef = doc(db, 'tournaments', toTournamentId, 'participants', userData.uid);
+        const participant: TournamentParticipant = {
+          uid: userData.uid,
+          email: userData.email,
+          displayName: userData.displayName,
+          photoURL: userData.photoURL,
+          points: 0,
+          exactMatchesCount: 0,
+          outcomeMatchesCount: 0,
+          completedProde: false,
+          joinedAt: Date.now()
+        };
+        batch.set(participantRef, participant);
+      }
+    }
+
+    await batch.commit();
+    console.log(`🔄 DB: Whitelist movida exitosamente para ${emailSanitized}.`);
+  } catch (err) {
+    console.error('Error al mover email de whitelist:', err);
+    throw err;
+  }
+};
+
+/**
+ * Recupera todos los torneos donde el usuario participa o ha sido invitado.
+ * Si ha sido invitado pero no se ha registrado como participante, lo une automáticamente.
+ */
+export const getTournamentsForUserInDB = async (
+  userId: string,
+  userEmail: string,
+  userRole: string
+): Promise<Tournament[]> => {
+  const emailSanitized = userEmail.trim().toLowerCase();
+
+  if (IS_MOCK_ENV) {
+    const tourneysJson = localStorage.getItem('prode_tournaments') || '[]';
+    const tourneys: Tournament[] = JSON.parse(tourneysJson);
+
+    if (userRole === 'admin') {
+      return tourneys;
+    }
+
+    const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+    const participants = JSON.parse(partsJson);
+
+    const wlJson = localStorage.getItem('prode_tournament_whitelist') || '[]';
+    const wl = JSON.parse(wlJson);
+
+    const userTournaments: Tournament[] = [];
+
+    for (const t of tourneys) {
+      const isPart = participants.some((p: any) => p.tournamentId === t.id && p.participant.uid === userId);
+      const isWhitelisted = wl.some((w: any) => w.tournamentId === t.id && w.email === emailSanitized);
+
+      if (isPart) {
+        userTournaments.push(t);
+      } else if (isWhitelisted) {
+        const usersJson = localStorage.getItem('prode_users') || '[]';
+        const users: UserProfile[] = JSON.parse(usersJson);
+        const userProfile = users.find(u => u.uid === userId);
+        if (userProfile) {
+          const participant: TournamentParticipant = {
+            uid: userId,
+            email: userProfile.email,
+            displayName: userProfile.displayName,
+            photoURL: userProfile.photoURL,
+            points: 0,
+            exactMatchesCount: 0,
+            outcomeMatchesCount: 0,
+            completedProde: false,
+            joinedAt: Date.now()
+          };
+          participants.push({ tournamentId: t.id, participant });
+          localStorage.setItem('prode_tournament_participants', JSON.stringify(participants));
+          userTournaments.push(t);
+        }
+      }
+    }
+
+    return userTournaments;
+  }
+
+  try {
+    // Admin puede listar todos los torneos directamente
+    if (userRole === 'admin') {
+      const allTournamentsSnap = await getDocs(collection(db, 'tournaments'));
+      const userTournaments: Tournament[] = [];
+      for (const docSnap of allTournamentsSnap.docs) {
+        userTournaments.push(docSnap.data() as Tournament);
+      }
+      return userTournaments;
+    }
+
+    // Para users/referees: NO podemos hacer list de todos los torneos (rules lo bloquean).
+    // Estrategia: obtener el tournamentId del perfil del usuario y hacer getDoc individual.
+    const userTournaments: Tournament[] = [];
+    const checkedIds = new Set<string>();
+
+    // 1. Leer el perfil propio (siempre permitido) para obtener tournamentId
+    const userProfileDoc = await getDoc(doc(db, 'users', userId));
+    if (userProfileDoc.exists()) {
+      const userProfile = userProfileDoc.data() as UserProfile;
+      
+      if (userProfile.tournamentId) {
+        checkedIds.add(userProfile.tournamentId);
+        try {
+          const tourneyDoc = await getDoc(doc(db, 'tournaments', userProfile.tournamentId));
+          if (tourneyDoc.exists()) {
+            const t = tourneyDoc.data() as Tournament;
+            userTournaments.push(t);
+
+            // Verificar si ya es participante, si no, auto-unirse si está en whitelist
+            const partDoc = await getDoc(doc(db, 'tournaments', t.id, 'participants', userId));
+            if (!partDoc.exists()) {
+              const wlDoc = await getDoc(doc(db, 'tournaments', t.id, 'whitelist', emailSanitized));
+              if (wlDoc.exists()) {
+                const participant: TournamentParticipant = {
+                  uid: userId,
+                  email: userProfile.email,
+                  displayName: userProfile.displayName,
+                  photoURL: userProfile.photoURL,
+                  points: 0,
+                  exactMatchesCount: 0,
+                  outcomeMatchesCount: 0,
+                  completedProde: false,
+                  joinedAt: Date.now()
+                };
+                await setDoc(doc(db, 'tournaments', t.id, 'participants', userId), participant);
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Error al acceder al torneo ${userProfile.tournamentId}:`, e);
+        }
+      }
+    }
+
+    return userTournaments;
+  } catch (err) {
+    console.error('Error al recuperar torneos del usuario:', err);
+    throw err;
+  }
+};
+
+/**
+ * Obtiene los participantes de un torneo específico
+ */
+export const getTournamentParticipantsInDB = async (
+  tournamentId: string
+): Promise<TournamentParticipant[]> => {
+  if (IS_MOCK_ENV) {
+    const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+    const participants = JSON.parse(partsJson);
+    return participants
+      .filter((p: any) => p.tournamentId === tournamentId)
+      .map((p: any) => p.participant);
+  }
+
+  try {
+    const snapshot = await getDocs(collection(db, 'tournaments', tournamentId, 'participants'));
+    const list: TournamentParticipant[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push(docSnap.data() as TournamentParticipant);
+    });
+    return list;
+  } catch (err) {
+    console.error('Error recuperando participantes del torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Recupera las predicciones de un usuario para un torneo
+ */
+export const getTournamentPredictionsInDB = async (
+  tournamentId: string,
+  userId: string
+): Promise<Prediction[]> => {
+  if (IS_MOCK_ENV) {
+    const predsJson = localStorage.getItem('prode_tournament_predictions') || '[]';
+    const predictions = JSON.parse(predsJson);
+    return predictions
+      .filter((p: any) => p.tournamentId === tournamentId && p.prediction.userId === userId)
+      .map((p: any) => p.prediction);
+  }
+
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'tournaments', tournamentId, 'predictions'), where('userId', '==', userId))
+    );
+    const list: Prediction[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push(docSnap.data() as Prediction);
+    });
+    return list;
+  } catch (err) {
+    console.error('Error al recuperar predicciones de torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Guarda o actualiza una predicción en un torneo personalizado
+ */
+export const saveTournamentPredictionInDB = async (
+  tournamentId: string,
+  userId: string,
+  matchId: string,
+  prediction: {
+    homePrediction?: number;
+    awayPrediction?: number;
+    predictionOutcome?: 'home' | 'away' | 'draw';
+  }
+): Promise<void> => {
+  const predictionId = `${userId}_${matchId}`;
+  
+  let isMatchPlayed = false;
+  let isGroupStage = false;
+  
+  if (IS_MOCK_ENV) {
+    const matches = await getMatchesFromDB();
+    const match = matches.find(m => m.matchId === matchId);
+    isMatchPlayed = match?.status === 'played';
+    isGroupStage = match?.phase === 'Fase de grupos';
+  } else {
+    const matchDoc = await getDoc(doc(db, 'matches', matchId));
+    if (matchDoc.exists()) {
+      const matchData = matchDoc.data();
+      isMatchPlayed = matchData.status === 'played';
+      isGroupStage = matchData.phase === 'Fase de grupos';
+    }
+  }
+
+  if (!isGroupStage) {
+    throw new Error('El prode es exclusivo de la Fase de grupos. No se admiten pronósticos para eliminatorias.');
+  }
+
+  if (isMatchPlayed) {
+    throw new Error('El partido ya se ha jugado. No se pueden modificar las predicciones.');
+  }
+
+  const newPrediction: Prediction = {
+    predictionId,
+    userId,
+    matchId,
+    ...prediction,
+    calculated: false
+  };
+
+  if (IS_MOCK_ENV) {
+    const predsJson = localStorage.getItem('prode_tournament_predictions') || '[]';
+    const predictions = JSON.parse(predsJson);
+    const idx = predictions.findIndex(
+      (p: any) => p.tournamentId === tournamentId && p.prediction.predictionId === predictionId
+    );
+    if (idx !== -1) {
+      predictions[idx].prediction = newPrediction;
+    } else {
+      predictions.push({ tournamentId, prediction: newPrediction });
+    }
+    localStorage.setItem('prode_tournament_predictions', JSON.stringify(predictions));
+    return;
+  }
+
+  try {
+    const docRef = doc(db, 'tournaments', tournamentId, 'predictions', predictionId);
+    await setDoc(docRef, newPrediction);
+  } catch (err) {
+    console.error('Error al guardar predicción de torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Sella el prode de un participante de torneo
+ */
+export const sealTournamentProdeInDB = async (
+  tournamentId: string,
+  userId: string
+): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+    const participants = JSON.parse(partsJson);
+    const idx = participants.findIndex(
+      (p: any) => p.tournamentId === tournamentId && p.participant.uid === userId
+    );
+    if (idx !== -1) {
+      participants[idx].participant.completedProde = true;
+      localStorage.setItem('prode_tournament_participants', JSON.stringify(participants));
+    }
+    return;
+  }
+
+  try {
+    const docRef = doc(db, 'tournaments', tournamentId, 'participants', userId);
+    await updateDoc(docRef, { completedProde: true });
+  } catch (err) {
+    console.error('Error al sellar prode de torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Permite cambiar el nombre del torneo (solo Referee o Admin)
+ */
+export const updateTournamentNameInDB = async (
+  tournamentId: string,
+  newName: string
+): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    const tourneysJson = localStorage.getItem('prode_tournaments') || '[]';
+    const tourneys: Tournament[] = JSON.parse(tourneysJson);
+    const idx = tourneys.findIndex(t => t.id === tournamentId);
+    if (idx !== -1) {
+      tourneys[idx].name = newName;
+      localStorage.setItem('prode_tournaments', JSON.stringify(tourneys));
+    }
+    return;
+  }
+
+  try {
+    const docRef = doc(db, 'tournaments', tournamentId);
+    await updateDoc(docRef, { name: newName });
+  } catch (err) {
+    console.error('Error al renombrar torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Permite cambiar el nombre y la modalidad del torneo (solo Referee o Admin).
+ * Si la modalidad se cambia de 'exact' a 'simple':
+ *   - Convierte todas las predicciones de los usuarios para este torneo a modalidad simple.
+ *   - Recalcula los puntos ganados para los partidos ya jugados y los puntos totales de los participantes.
+ */
+export const updateTournamentInDB = async (
+  tournamentId: string,
+  newName: string,
+  newModality: 'exact' | 'simple'
+): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    const tourneysJson = localStorage.getItem('prode_tournaments') || '[]';
+    const tourneys: Tournament[] = JSON.parse(tourneysJson);
+    const idx = tourneys.findIndex(t => t.id === tournamentId);
+    if (idx === -1) throw new Error('Torneo no encontrado');
+
+    const oldModality = tourneys[idx].modality;
+    tourneys[idx].name = newName;
+
+    // Solo se permite de exact -> simple
+    if (oldModality === 'exact' && newModality === 'simple') {
+      tourneys[idx].modality = 'simple';
+
+      // 1. Convertir predicciones
+      const predsJson = localStorage.getItem('prode_tournament_predictions') || '[]';
+      const predictions = JSON.parse(predsJson);
+      const matchesJson = localStorage.getItem('prode_matches') || '[]';
+      const matches: Match[] = JSON.parse(matchesJson);
+
+      predictions.forEach((item: any) => {
+        if (item.tournamentId === tournamentId) {
+          const pred = item.prediction;
+          if (pred.homePrediction !== undefined && pred.awayPrediction !== undefined) {
+            const home = pred.homePrediction;
+            const away = pred.awayPrediction;
+            pred.predictionOutcome = home > away ? 'home' : home < away ? 'away' : 'draw';
+            delete pred.homePrediction;
+            delete pred.awayPrediction;
+
+            // Recalcular puntos ganados si el partido ya se jugó
+            const match = matches.find(m => m.matchId === pred.matchId);
+            if (match && match.status === 'played' && match.homeScore !== undefined && match.awayScore !== undefined) {
+              const res = calculatePointsSimple(pred.predictionOutcome, match.homeScore, match.awayScore);
+              pred.pointsEarned = res.points;
+              pred.calculated = true;
+            } else {
+              delete pred.pointsEarned;
+              pred.calculated = false;
+            }
+          }
+        }
+      });
+      localStorage.setItem('prode_tournament_predictions', JSON.stringify(predictions));
+
+      // 2. Recalcular puntos de los participantes
+      const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+      const participants = JSON.parse(partsJson);
+
+      participants.forEach((pItem: any) => {
+        if (pItem.tournamentId === tournamentId) {
+          const part = pItem.participant;
+          const userPreds = predictions
+            .filter((p: any) => p.tournamentId === tournamentId && p.prediction.userId === part.uid)
+            .map((p: any) => p.prediction);
+
+          let totalPoints = 0;
+          let outcomeCount = 0;
+
+          userPreds.forEach((pred: any) => {
+            if (pred.calculated && pred.pointsEarned !== undefined) {
+              totalPoints += pred.pointsEarned;
+              if (pred.pointsEarned === 1) outcomeCount++;
+            }
+          });
+
+          part.points = totalPoints;
+          part.exactMatchesCount = 0;
+          part.outcomeMatchesCount = outcomeCount;
+        }
+      });
+      localStorage.setItem('prode_tournament_participants', JSON.stringify(participants));
+    }
+    
+    localStorage.setItem('prode_tournaments', JSON.stringify(tourneys));
+    return;
+  }
+
+  try {
+    const tourneyRef = doc(db, 'tournaments', tournamentId);
+    const tourneySnap = await getDoc(tourneyRef);
+    if (!tourneySnap.exists()) throw new Error('Torneo no encontrado');
+
+    const tourneyData = tourneySnap.data() as Tournament;
+    const oldModality = tourneyData.modality;
+
+    const updates: any = { name: newName };
+
+    // Si cambia de exact -> simple
+    if (oldModality === 'exact' && newModality === 'simple') {
+      updates.modality = 'simple';
+
+      // 1. Obtener todos los partidos para saber sus resultados reales actuales
+      const matchesColl = collection(db, 'matches');
+      const matchesSnap = await getDocs(matchesColl);
+      const matchesMap: { [key: string]: Match } = {};
+      matchesSnap.forEach((docSnap) => {
+        matchesMap[docSnap.id] = docSnap.data() as Match;
+      });
+
+      // 2. Obtener todas las predicciones del torneo
+      const predsColl = collection(db, 'tournaments', tournamentId, 'predictions');
+      const predsSnap = await getDocs(predsColl);
+
+      let batch = writeBatch(db);
+      let count = 0;
+
+      for (const predDoc of predsSnap.docs) {
+        const pred = predDoc.data() as Prediction;
+        if (pred.homePrediction !== undefined && pred.awayPrediction !== undefined) {
+          const home = pred.homePrediction;
+          const away = pred.awayPrediction;
+          const outcome = home > away ? 'home' : home < away ? 'away' : 'draw';
+
+          const predUpdates: any = {
+            predictionOutcome: outcome,
+            homePrediction: deleteField(),
+            awayPrediction: deleteField()
+          };
+
+          const match = matchesMap[pred.matchId];
+          if (match && match.status === 'played' && match.homeScore !== undefined && match.awayScore !== undefined) {
+            const res = calculatePointsSimple(outcome, match.homeScore, match.awayScore);
+            predUpdates.pointsEarned = res.points;
+            predUpdates.calculated = true;
+          } else {
+            predUpdates.pointsEarned = deleteField();
+            predUpdates.calculated = false;
+          }
+
+          batch.update(predDoc.ref, predUpdates);
+          count++;
+
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
+        }
+      }
+      if (count > 0) {
+        await batch.commit();
+      }
+
+      // 3. Recalcular la puntuación de cada participante
+      const participantsColl = collection(db, 'tournaments', tournamentId, 'participants');
+      const participantsSnap = await getDocs(participantsColl);
+
+      batch = writeBatch(db);
+      count = 0;
+
+      for (const partDoc of participantsSnap.docs) {
+        const userId = partDoc.id;
+        
+        const userPredsSnap = await getDocs(
+          query(collection(db, 'tournaments', tournamentId, 'predictions'), where('userId', '==', userId))
+        );
+
+        let totalPoints = 0;
+        let outcomeCount = 0;
+
+        userPredsSnap.forEach((upDoc) => {
+          const upData = upDoc.data() as Prediction;
+          if (upData.calculated && upData.pointsEarned !== undefined) {
+            totalPoints += upData.pointsEarned;
+            if (upData.pointsEarned === 1) outcomeCount++;
+          }
+        });
+
+        batch.update(partDoc.ref, {
+          points: totalPoints,
+          exactMatchesCount: 0,
+          outcomeMatchesCount: outcomeCount
+        });
+
+        count++;
+        if (count >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      }
+
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
+
+    await updateDoc(tourneyRef, updates);
+  } catch (err) {
+    console.error('Error al actualizar torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Elimina un torneo por completo de la base de datos (con todas sus subcolecciones)
+ */
+export const deleteTournamentFromDB = async (
+  tournamentId: string
+): Promise<void> => {
+  if (IS_MOCK_ENV) {
+    const tourneysJson = localStorage.getItem('prode_tournaments') || '[]';
+    const tourneys: Tournament[] = JSON.parse(tourneysJson);
+    const updatedTourneys = tourneys.filter(t => t.id !== tournamentId);
+    localStorage.setItem('prode_tournaments', JSON.stringify(updatedTourneys));
+
+    const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+    const participants = JSON.parse(partsJson);
+    const updatedParts = participants.filter((p: any) => p.tournamentId !== tournamentId);
+    localStorage.setItem('prode_tournament_participants', JSON.stringify(updatedParts));
+
+    const predsJson = localStorage.getItem('prode_tournament_predictions') || '[]';
+    const predictions = JSON.parse(predsJson);
+    const updatedPreds = predictions.filter((p: any) => p.tournamentId !== tournamentId);
+    localStorage.setItem('prode_tournament_predictions', JSON.stringify(updatedPreds));
+
+    const wlJson = localStorage.getItem('prode_tournament_whitelist') || '[]';
+    const wl = JSON.parse(wlJson);
+    const updatedWl = wl.filter((w: any) => w.tournamentId !== tournamentId);
+    localStorage.setItem('prode_tournament_whitelist', JSON.stringify(updatedWl));
+
+    return;
+  }
+
+  try {
+    const predsSnap = await getDocs(collection(db, 'tournaments', tournamentId, 'predictions'));
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const d of predsSnap.docs) {
+      batch.delete(d.ref);
+      count++;
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+    
+    const partsSnap = await getDocs(collection(db, 'tournaments', tournamentId, 'participants'));
+    for (const d of partsSnap.docs) {
+      batch.delete(d.ref);
+      count++;
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+
+    const wlSnap = await getDocs(collection(db, 'tournaments', tournamentId, 'whitelist'));
+    for (const d of wlSnap.docs) {
+      batch.delete(d.ref);
+      count++;
+      if (count >= 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+
+    batch.delete(doc(db, 'tournaments', tournamentId));
+    await batch.commit();
+  } catch (err) {
+    console.error('Error al borrar torneo de Firestore:', err);
+    throw err;
+  }
+};
+
+/**
+ * Remueve a un usuario de un torneo personalizado (desvincula participante, predicciones y whitelist)
+ */
+export const removeUserFromTournamentInDB = async (
+  tournamentId: string,
+  userId: string,
+  userEmail: string
+): Promise<void> => {
+  const emailSanitized = userEmail.trim().toLowerCase();
+
+  if (IS_MOCK_ENV) {
+    const partsJson = localStorage.getItem('prode_tournament_participants') || '[]';
+    const participants = JSON.parse(partsJson);
+    const updatedParts = participants.filter(
+      (p: any) => !(p.tournamentId === tournamentId && p.participant.uid === userId)
+    );
+    localStorage.setItem('prode_tournament_participants', JSON.stringify(updatedParts));
+
+    const predsJson = localStorage.getItem('prode_tournament_predictions') || '[]';
+    const predictions = JSON.parse(predsJson);
+    const updatedPreds = predictions.filter(
+      (p: any) => !(p.tournamentId === tournamentId && p.prediction.userId === userId)
+    );
+    localStorage.setItem('prode_tournament_predictions', JSON.stringify(updatedPreds));
+
+    const wlJson = localStorage.getItem('prode_tournament_whitelist') || '[]';
+    const wl = JSON.parse(wlJson);
+    const updatedWl = wl.filter(
+      (w: any) => !(w.tournamentId === tournamentId && w.email === emailSanitized)
+    );
+    localStorage.setItem('prode_tournament_whitelist', JSON.stringify(updatedWl));
+
+    return;
+  }
+
+  try {
+    let batch = writeBatch(db);
+    
+    batch.delete(doc(db, 'tournaments', tournamentId, 'participants', userId));
+
+    const predsSnap = await getDocs(
+      query(collection(db, 'tournaments', tournamentId, 'predictions'), where('userId', '==', userId))
+    );
+    predsSnap.forEach((d) => {
+      batch.delete(d.ref);
+    });
+
+    batch.delete(doc(db, 'tournaments', tournamentId, 'whitelist', emailSanitized));
+
+    await batch.commit();
+  } catch (err) {
+    console.error('Error al quitar usuario del torneo:', err);
+    throw err;
+  }
+};
+
+/**
+ * Actualiza el rol de un correo en la whitelist global y, si el usuario ya está registrado,
+ * también actualiza su rol en su documento de usuario (/users/{userId}).
+ */
+export const updateUserRoleInDB = async (
+  email: string,
+  newRole: UserRole,
+  userId: string | null = null
+): Promise<void> => {
+  const emailSanitized = email.trim().toLowerCase();
+
+  if (IS_MOCK_ENV) {
+    const usersJson = localStorage.getItem('prode_users') || '[]';
+    const users: UserProfile[] = JSON.parse(usersJson);
+    const userObj = users.find(u => u.email.trim().toLowerCase() === emailSanitized);
+    if (userObj) {
+      userObj.role = newRole;
+      localStorage.setItem('prode_users', JSON.stringify(users));
+    }
+    return;
+  }
+
+  try {
+    const batch = writeBatch(db);
+
+    // 1. Actualizar o recrear la entrada en la whitelist global
+    const wlRef = doc(db, 'whitelist', emailSanitized);
+    const wlSnap = await getDoc(wlRef);
+    if (wlSnap.exists()) {
+      batch.update(wlRef, { role: newRole });
+    } else {
+      batch.set(wlRef, {
+        email: emailSanitized,
+        role: newRole,
+        addedBy: 'admin',
+        createdAt: serverTimestamp()
+      });
+    }
+
+    // 2. Buscar al usuario de manera case-insensitive
+    let matchedUserId: string | null = userId;
+    if (!matchedUserId) {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      usersSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.email && data.email.trim().toLowerCase() === emailSanitized) {
+          matchedUserId = docSnap.id;
+        }
+      });
+    }
+
+    if (matchedUserId) {
+      const userRef = doc(db, 'users', matchedUserId);
+      batch.update(userRef, { role: newRole });
+      console.log(`🔑 Actualizando rol en /users/${matchedUserId} a ${newRole} (case-insensitive).`);
+    } else {
+      console.log(`⚠️ No se encontró usuario registrado en /users para el correo ${emailSanitized}.`);
+    }
+
+    await batch.commit();
+    console.log(`🔑 Rol actualizado con éxito a ${newRole} para el email ${emailSanitized}.`);
+  } catch (err) {
+    console.error('Error al actualizar el rol del usuario:', err);
+    throw err;
+  }
+};
+
 
 

@@ -6,7 +6,8 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   sendPasswordResetEmail,
-  updateProfile
+  updateProfile,
+  deleteUser
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -158,6 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // Registro con Validación de Whitelist Obligatoria
+  // Flujo seguro: crear cuenta Auth primero, validar whitelist después, borrar cuenta si no está autorizado.
   const register = async (email: string, pass: string, name: string) => {
     if (IS_MOCK_ENV) {
       const mockNewUser: UserProfile = {
@@ -193,11 +195,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const sanitizedEmail = email.trim().toLowerCase();
 
     try {
-      // 1. Validar contra la Whitelist en Firestore antes de crear la cuenta
+      // 1. Crear el usuario en Firebase Authentication PRIMERO
+      // Esto nos da autenticación para poder leer la whitelist de forma segura.
+      const credential = await createUserWithEmailAndPassword(auth, sanitizedEmail, pass);
+
+      // 2. Ahora que estamos autenticados, validar contra la Whitelist en Firestore
       const whitelistDocRef = doc(db, 'whitelist', sanitizedEmail);
-      const whitelistDoc = await getDoc(whitelistDocRef);
+      let whitelistDoc;
+      try {
+        whitelistDoc = await getDoc(whitelistDocRef);
+      } catch (wlErr) {
+        // Si falla la lectura de whitelist, borrar la cuenta recién creada
+        await deleteUser(credential.user);
+        const customError = 'Error al verificar autorización. Intenta de nuevo.';
+        setError(customError);
+        throw new Error(customError);
+      }
 
       if (!whitelistDoc.exists()) {
+        // Email no autorizado: borrar la cuenta recién creada y notificar
+        await deleteUser(credential.user);
         const customError = 'Este correo electrónico no está autorizado para registrarse en la plataforma privada.';
         setError(customError);
         throw new Error(customError);
@@ -206,9 +223,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Obtener el rol pre-asignado si existe (por defecto 'user')
       const whitelistData = whitelistDoc.data();
       const assignedRole: UserRole = whitelistData?.role || 'user';
+      const assignedTournamentId: string | null = whitelistData?.tournamentId || null;
 
-      // 2. Crear el usuario en Firebase Authentication
-      const credential = await createUserWithEmailAndPassword(auth, sanitizedEmail, pass);
       const photoURL = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`;
 
       // 3. Actualizar perfil nativo de Firebase
@@ -224,6 +240,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         displayName: name,
         photoURL: photoURL,
         role: assignedRole,
+        tournamentId: assignedTournamentId,
         completedProde: false,
         points: 0,
         exactMatchesCount: 0,
