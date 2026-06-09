@@ -140,9 +140,12 @@ service cloud.firestore {
 
       // Predicciones del torneo — visibles para participantes del mismo torneo, referee dueño y admin
       match /predictions/{predictionId} {
-        allow read: if isAdmin() || 
+        allow get: if isAdmin() || 
         (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
         (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
+
+        allow list: if isAdmin() ||
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
 
         // CREATE: solo el dueño, antes del mundial
         allow create: if isAuth() && 
@@ -170,7 +173,9 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsEarned', 'calculated'])
         );
 
-        allow delete: if isAuth() && request.auth.uid == resource.data.userId && isBeforeTournament();
+        allow delete: if (isAuth() && request.auth.uid == resource.data.userId && isBeforeTournament()) ||
+        isAdmin() ||
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
       }
     }
   }
