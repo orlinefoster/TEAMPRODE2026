@@ -22,8 +22,16 @@ service cloud.firestore {
 
     // Perfiles de usuario
     match /users/{userId} {
-      // Cada usuario solo puede leer su propio perfil. Admin puede leer todos.
-      allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+      // Cada usuario solo puede leer su propio perfil. Admin puede leer todos. Referees pueden buscar/leer perfiles para invitar.
+      allow get: if isAuth() && (
+        request.auth.uid == userId || 
+        isAdmin() || 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee'
+      );
+      allow list: if isAdmin() || (
+        isAuth() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee'
+      );
 
       // Al registrarse, el perfil DEBE nacer con 0 puntos y tomar su rol asignado en la whitelist
       allow create: if (isAuth() && (request.auth.uid == userId) && 
@@ -44,12 +52,24 @@ service cloud.firestore {
     match /whitelist/{email} {
       allow get: if isAuth();
       allow list: if isAdmin();
+      
+      // Permitir crear entrada en la whitelist si es admin o si es referee agregando a un usuario de su propio torneo
       allow create: if isAdmin() || (
-      isAuth() && 
-      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee' &&
-      request.resource.data.role == 'user'
+        isAuth() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee' &&
+        request.resource.data.role == 'user' &&
+        (!('tournamentId' in request.resource.data) || request.resource.data.tournamentId == null || request.resource.data.tournamentId == '' || get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)).data.refereeId == request.auth.uid)
       );
-      allow update, delete: if isAdmin();
+      
+      // Permitir actualizar entrada en la whitelist (ej. asociarle tournamentId) si es admin o si es referee reclamando un usuario flotante para su propio torneo
+      allow update: if isAdmin() || (
+        isAuth() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee' &&
+        (!('tournamentId' in resource.data) || resource.data.tournamentId == null || resource.data.tournamentId == '') &&
+        get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)).data.refereeId == request.auth.uid
+      );
+
+      allow delete: if isAdmin();
     }
 
     // Partidos
