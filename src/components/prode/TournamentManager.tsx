@@ -90,7 +90,7 @@ export const TournamentManager: React.FC<TournamentManagerProps> = ({
     }
   };
 
-  const isReferee = activeTournament && (activeTournament.refereeId === user.uid || user.role === 'admin');
+  const isReferee = activeTournament && (user.role === 'referee' || user.role === 'admin');
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '30px', alignItems: 'start' }}>
@@ -297,7 +297,7 @@ export const TournamentManager: React.FC<TournamentManagerProps> = ({
                   </span>
                   <span>•</span>
                   <span>
-                    Árbitro: <strong>{isReferee && activeTournament.refereeId === user.uid ? 'Vos' : 'Moderador'}</strong>
+                    Rol: <strong>{user.role === 'referee' ? 'Árbitro' : user.role === 'admin' ? 'Admin' : 'Participante'}</strong>
                   </span>
                 </div>
               </div>
@@ -386,7 +386,7 @@ export const TournamentManager: React.FC<TournamentManagerProps> = ({
                       />
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                          {p.displayName} {p.uid === activeTournament.refereeId && <span style={{ color: 'var(--accent-gold)', fontSize: '0.75rem', marginLeft: '5px' }}>📢 Árbitro</span>}
+                          {p.displayName} {p.email && participants.some(pp => pp.uid === p.uid) && (() => { /* referee badge handled by role, not by refereeId */ return null; })()}
                         </span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.email}</span>
                       </div>

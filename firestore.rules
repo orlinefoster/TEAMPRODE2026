@@ -15,11 +15,17 @@ service cloud.firestore {
       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Función para verificar si el usuario es árbitro (referee)
+    // Función para verificar si el usuario tiene rol árbitro (global)
     function isReferee() {
       return isAuth() && 
       exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee';
+    }
+
+    // Función para verificar si el usuario es árbitro Y participa en un torneo específico
+    function isRefereeOfTournament(tournamentId) {
+      return isReferee() &&
+      exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid));
     }
 
     // Límite de tiempo: 11-06-2026 (ONCE DE JUNIO DE 2026) 16:00:00 UTC (Inicio del primer partido)
@@ -60,20 +66,24 @@ service cloud.firestore {
       allow get: if isAuth();
       allow list: if isAdmin();
       
-      // Permitir crear entrada en la whitelist si es admin o si es referee agregando a un usuario de su propio torneo
+      // Permitir crear entrada en la whitelist si es admin o si es referee participante del torneo destino
       allow create: if isAdmin() || (
-        isAuth() && 
         isReferee() &&
         request.resource.data.role == 'user' &&
-        (!('tournamentId' in request.resource.data) || request.resource.data.tournamentId == null || request.resource.data.tournamentId == '' || get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)).data.refereeId == request.auth.uid)
+        'tournamentId' in request.resource.data &&
+        request.resource.data.tournamentId != null &&
+        request.resource.data.tournamentId != '' &&
+        isRefereeOfTournament(request.resource.data.tournamentId)
       );
       
       // Permitir actualizar entrada en la whitelist (ej. asociarle tournamentId) si es admin o si es referee reclamando un usuario flotante para su propio torneo
       allow update: if isAdmin() || (
-        isAuth() && 
         isReferee() &&
         (!('tournamentId' in resource.data) || resource.data.tournamentId == null || resource.data.tournamentId == '') &&
-        get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)).data.refereeId == request.auth.uid
+        'tournamentId' in request.resource.data &&
+        request.resource.data.tournamentId != null &&
+        request.resource.data.tournamentId != '' &&
+        isRefereeOfTournament(request.resource.data.tournamentId)
       );
 
       allow delete: if isAdmin();
@@ -125,50 +135,47 @@ service cloud.firestore {
       request.resource.data.refereeId == request.auth.uid &&
       (isReferee() || isAdmin());
 
-      // Permitir actualizar / borrar si es árbitro o admin global
-      allow update, delete: if isAdmin() || (isAuth() && resource.data.refereeId == request.auth.uid);
+      // Permitir actualizar / borrar si es admin o referee participante del torneo
+      allow update, delete: if isAdmin() || isRefereeOfTournament(tournamentId);
 
       // Lista de correos autorizados para el torneo (whitelist)
       match /whitelist/{email} {
         allow get: if isAuth();
-        allow list, write: if isAdmin() || 
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
+        allow list, write: if isAdmin() || isRefereeOfTournament(tournamentId);
       }
 
       // Participantes del torneo
       match /participants/{userId} {
-        // Leer participantes: admin, referee dueño, uno mismo, o participante del torneo
+        // Leer participantes: admin, referee del torneo, uno mismo, o participante del torneo
         allow read: if isAdmin() || 
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        isRefereeOfTournament(tournamentId) ||
         (isAuth() && request.auth.uid == userId) ||
         (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
 
-        // Crear participante: si el usuario mismo se une (y está en la whitelist o es árbitro/admin), o si lo agrega el árbitro/admin
+        // Crear participante: si el usuario mismo se une (y está en la whitelist), o si lo agrega un referee/admin
         allow create: if (isAuth() && request.auth.uid == userId && 
-        (exists(/databases/$(database)/documents/tournaments/$(tournamentId)/whitelist/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email)) ||
-        get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid)) ||
+        exists(/databases/$(database)/documents/tournaments/$(tournamentId)/whitelist/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email))) ||
         isAdmin() || 
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
+        isRefereeOfTournament(tournamentId);
 
         // Actualizar participante:
-        // El árbitro o admin puede actualizar puntos y counts; el usuario mismo puede actualizar campos básicos sin alterar puntos
+        // El referee del torneo o admin puede actualizar puntos y counts; el usuario mismo puede actualizar campos básicos sin alterar puntos
         allow update: if isAdmin() || 
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        isRefereeOfTournament(tournamentId) ||
         (isAuth() && request.auth.uid == userId && 
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['points', 'exactMatchesCount', 'outcomeMatchesCount'])));
 
-        allow delete: if isAdmin() || 
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
+        allow delete: if isAdmin() || isRefereeOfTournament(tournamentId);
       }
 
       // Predicciones del torneo — visibles para participantes del mismo torneo, referee dueño y admin
       match /predictions/{predictionId} {
         allow get: if isAdmin() || 
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        isRefereeOfTournament(tournamentId) ||
         (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
 
         allow list: if isAdmin() ||
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        isRefereeOfTournament(tournamentId) ||
         (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
 
         // CREATE: solo el dueño, antes del mundial
@@ -192,14 +199,13 @@ service cloud.firestore {
         isAdmin() && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsEarned', 'calculated'])
         ) || (
-        isAuth() && 
-        get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid &&
+        isRefereeOfTournament(tournamentId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pointsEarned', 'calculated'])
         );
 
         allow delete: if (isAuth() && request.auth.uid == resource.data.userId && isBeforeTournament()) ||
         isAdmin() ||
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
+        isRefereeOfTournament(tournamentId);
       }
     }
   }

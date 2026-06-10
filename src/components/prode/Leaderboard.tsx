@@ -6,12 +6,14 @@ interface LeaderboardProps {
   users: UserProfile[];
   onSelectUser: (user: UserProfile) => void;
   isAdmin: boolean;
+  pendingEmails?: string[];
 }
 
 export const Leaderboard: React.FC<LeaderboardProps> = ({
   users,
   onSelectUser,
-  isAdmin
+  isAdmin,
+  pendingEmails = []
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -168,11 +170,62 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         )}
       </div>
 
+      {/* Tabla de mails pendientes de registro */}
+      {pendingEmails.length > 0 && (
+        <div className="glass-panel" style={{ padding: '25px' }}>
+          <div style={{ marginBottom: '15px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+              ⏳ Pendientes de Registro
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px' }}>
+              Estos correos están invitados al torneo pero aún no se registraron en la app.
+            </p>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-light)' }}>
+                  <th style={{ padding: '10px 8px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.8rem', textTransform: 'uppercase', width: '50px', textAlign: 'center' }}>#</th>
+                  <th style={{ padding: '10px 8px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.8rem', textTransform: 'uppercase' }}>Email</th>
+                  <th style={{ padding: '10px 8px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.8rem', textTransform: 'uppercase', textAlign: 'center' }}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingEmails.map((email, idx) => (
+                  <tr key={email} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <td style={{ padding: '10px 8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      {idx + 1}
+                    </td>
+                    <td style={{ padding: '10px 8px', fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                      {email}
+                    </td>
+                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        color: 'var(--accent-gold)'
+                      }}>
+                        Pendiente
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .leaderboard-row:hover {
           background-color: var(--bg-overlay);
         }
-      `}</style>
+      `}
+      </style>
     </div>
   );
 };

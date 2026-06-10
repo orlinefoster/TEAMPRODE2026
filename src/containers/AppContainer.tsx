@@ -126,6 +126,9 @@ export const AppContainer: React.FC = () => {
   // Estado para seleccionar torneo en el Ranking (evita consulta automática al entrar a la sección)
   const [rankingTournamentId, setRankingTournamentId] = useState<string | null | 'pending'>('pending');
 
+  // Emails de la whitelist pendientes de registro (no son participantes aún)
+  const [pendingEmails, setPendingEmails] = useState<string[]>([]);
+
   // Estado para seleccionar el torneo en la Whitelist del panel de admin
   const [selectedWhitelistTournamentId, setSelectedWhitelistTournamentId] = useState<string | null>(null);
 
@@ -259,6 +262,18 @@ export const AppContainer: React.FC = () => {
             allPreds.push(docSnap.data() as Prediction);
           });
           setAllPredictions(allPreds);
+        }
+
+        // Cargar whitelist del torneo y calcular emails pendientes de registro
+        try {
+          const wlSnap = await getDocs(collection(db, 'tournaments', targetTournamentId, 'whitelist'));
+          const wlEmails = wlSnap.docs.map(d => d.id.trim().toLowerCase());
+          const participantEmails = new Set(tourneyParts.map(p => p.email.trim().toLowerCase()));
+          const pending = wlEmails.filter(email => !participantEmails.has(email));
+          setPendingEmails(pending);
+        } catch (e) {
+          console.error('Error al cargar whitelist pendientes:', e);
+          setPendingEmails([]);
         }
       } else {
         // Cargar datos del Torneo Global predeterminado
@@ -398,8 +413,8 @@ export const AppContainer: React.FC = () => {
     setWhitelistLoading(true);
 
     if (user.role === 'referee') {
-      const myOwnedTournament = tournaments.find(t => t.id === activeTournamentId && t.refereeId === user.uid);
-      if (!activeTournamentId || !myOwnedTournament) {
+      const isParticipant = activeTournamentId && tournaments.some(t => t.id === activeTournamentId);
+      if (!activeTournamentId || !isParticipant) {
         setWhitelistEntries([]);
         setWhitelistLoading(false);
         return;
@@ -1331,6 +1346,7 @@ export const AppContainer: React.FC = () => {
                       users={participants}
                       onSelectUser={handleSelectParticipant}
                       isAdmin={isAdmin}
+                      pendingEmails={pendingEmails}
                     />
 
                     {/* Panel flotante de detalle si seleccionan un usuario */}
