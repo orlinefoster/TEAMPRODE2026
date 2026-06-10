@@ -15,6 +15,13 @@ service cloud.firestore {
       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Función para verificar si el usuario es árbitro (referee)
+    function isReferee() {
+      return isAuth() && 
+      exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee';
+    }
+
     // Límite de tiempo: 11-06-2026 (ONCE DE JUNIO DE 2026) 16:00:00 UTC (Inicio del primer partido)
     function isBeforeTournament() {
       return request.time.toMillis() < 1781193600000;
@@ -26,11 +33,11 @@ service cloud.firestore {
       allow get: if isAuth() && (
         request.auth.uid == userId || 
         isAdmin() || 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee'
+        isReferee()
       );
       allow list: if isAdmin() || (
         isAuth() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee'
+        isReferee()
       );
 
       // Al registrarse, el perfil DEBE nacer con 0 puntos y tomar su rol asignado en la whitelist
@@ -56,7 +63,7 @@ service cloud.firestore {
       // Permitir crear entrada en la whitelist si es admin o si es referee agregando a un usuario de su propio torneo
       allow create: if isAdmin() || (
         isAuth() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee' &&
+        isReferee() &&
         request.resource.data.role == 'user' &&
         (!('tournamentId' in request.resource.data) || request.resource.data.tournamentId == null || request.resource.data.tournamentId == '' || get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)).data.refereeId == request.auth.uid)
       );
@@ -64,7 +71,7 @@ service cloud.firestore {
       // Permitir actualizar entrada en la whitelist (ej. asociarle tournamentId) si es admin o si es referee reclamando un usuario flotante para su propio torneo
       allow update: if isAdmin() || (
         isAuth() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee' &&
+        isReferee() &&
         (!('tournamentId' in resource.data) || resource.data.tournamentId == null || resource.data.tournamentId == '') &&
         get(/databases/$(database)/documents/tournaments/$(request.resource.data.tournamentId)).data.refereeId == request.auth.uid
       );
@@ -116,10 +123,7 @@ service cloud.firestore {
       // Permitir crear si está autenticado y es admin o referee
       allow create: if isAuth() && 
       request.resource.data.refereeId == request.auth.uid &&
-      (
-      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'referee' ||
-      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-      );
+      (isReferee() || isAdmin());
 
       // Permitir actualizar / borrar si es árbitro o admin global
       allow update, delete: if isAdmin() || (isAuth() && resource.data.refereeId == request.auth.uid);
