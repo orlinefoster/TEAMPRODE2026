@@ -265,27 +265,35 @@ export const AppContainer: React.FC = () => {
         const userPreds = await getUserPredictions(user.uid);
         setPredictions(userPreds);
 
-        const parts = await getAllParticipantsFromDB();
-        const filteredParts = parts.filter(p => 
-          !p.isGhost && 
-          p.role !== 'admin' && 
-          p.email.trim().toLowerCase() !== 'admin@teamprode.com' &&
-          !p.email.trim().toLowerCase().startsWith('admin@') &&
-          !p.displayName.toLowerCase().includes('admin')
-        );
-        setParticipants(filteredParts);
-        setActiveTournamentParticipants([]);
+        if (user.role === 'admin') {
+          const parts = await getAllParticipantsFromDB();
+          const filteredParts = parts.filter(p => 
+            !p.isGhost && 
+            p.role !== 'admin' && 
+            p.email.trim().toLowerCase() !== 'admin@teamprode.com' &&
+            !p.email.trim().toLowerCase().startsWith('admin@') &&
+            !p.displayName.toLowerCase().includes('admin')
+          );
+          setParticipants(filteredParts);
+          setActiveTournamentParticipants([]);
 
-        if (IS_MOCK_ENV) {
-          const allPredsJson = localStorage.getItem('prode_predictions') || '[]';
-          setAllPredictions(JSON.parse(allPredsJson));
+          if (IS_MOCK_ENV) {
+            const allPredsJson = localStorage.getItem('prode_predictions') || '[]';
+            setAllPredictions(JSON.parse(allPredsJson));
+          } else {
+            const allPredsSnap = await getDocs(collection(db, 'predictions'));
+            const allPreds: Prediction[] = [];
+            allPredsSnap.forEach((docSnap: any) => {
+              allPreds.push(docSnap.data() as Prediction);
+            });
+            setAllPredictions(allPreds);
+          }
         } else {
-          const allPredsSnap = await getDocs(collection(db, 'predictions'));
-          const allPreds: Prediction[] = [];
-          allPredsSnap.forEach((docSnap: any) => {
-            allPreds.push(docSnap.data() as Prediction);
-          });
-          setAllPredictions(allPreds);
+          // Si es un usuario común sin torneo asignado aún (o en carga inicial),
+          // solo se ve a sí mismo en los participantes y solo ve sus propias predicciones
+          setParticipants([user]);
+          setActiveTournamentParticipants([]);
+          setAllPredictions(userPreds);
         }
       }
     } catch (err) {

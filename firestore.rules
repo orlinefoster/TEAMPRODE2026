@@ -89,10 +89,8 @@ service cloud.firestore {
 
     // Torneos personalizados paralelos
     match /tournaments/{tournamentId} {
-      // Leer torneo: admin ve todo (list+get). Referee dueño y participantes solo get individual.
-      allow get: if isAdmin() || 
-        (isAuth() && resource.data.refereeId == request.auth.uid) ||
-        (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
+      // Leer torneo: cualquier usuario autenticado puede hacer get individual para unirse.
+      allow get: if isAuth();
       allow list: if isAdmin();
 
       // Permitir crear si está autenticado y es admin o referee
@@ -115,9 +113,10 @@ service cloud.firestore {
 
       // Participantes del torneo
       match /participants/{userId} {
-        // Leer participantes: admin, referee dueño, o participante del torneo
+        // Leer participantes: admin, referee dueño, uno mismo, o participante del torneo
         allow read: if isAdmin() || 
         (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        (isAuth() && request.auth.uid == userId) ||
         (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
 
         // Crear participante: si el usuario mismo se une (y está en la whitelist o es árbitro/admin), o si lo agrega el árbitro/admin
@@ -145,7 +144,8 @@ service cloud.firestore {
         (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
 
         allow list: if isAdmin() ||
-        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid);
+        (isAuth() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.refereeId == request.auth.uid) ||
+        (isAuth() && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/participants/$(request.auth.uid)));
 
         // CREATE: solo el dueño, antes del mundial
         allow create: if isAuth() && 

@@ -105,28 +105,30 @@ export const TournamentManager: React.FC<TournamentManagerProps> = ({
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {/* Torneo Global */}
-            <button
-              onClick={() => onSelectTournament(null)}
-              className="btn"
-              style={{
-                width: '100%',
-                padding: '12px 15px',
-                textAlign: 'left',
-                borderRadius: '8px',
-                backgroundColor: activeTournament === null ? 'var(--border-light)' : 'var(--bg-overlay)',
-                color: activeTournament === null ? 'var(--accent-gold)' : 'var(--text-main)',
-                border: activeTournament === null ? '1px solid var(--border-active)' : '1px solid var(--border-light)',
-                fontWeight: activeTournament === null ? 700 : 500,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                transition: 'all 0.2s'
-              }}
-            >
-              <span>🌍 Prode Mundial 2026 (Global)</span>
-              {activeTournament === null && <span style={{ fontSize: '0.8rem' }}>• Activo</span>}
-            </button>
+            {/* Torneo Global - Solo visible para el Admin */}
+            {user.role === 'admin' && (
+              <button
+                onClick={() => onSelectTournament(null)}
+                className="btn"
+                style={{
+                  width: '100%',
+                  padding: '12px 15px',
+                  textAlign: 'left',
+                  borderRadius: '8px',
+                  backgroundColor: activeTournament === null ? 'var(--border-light)' : 'var(--bg-overlay)',
+                  color: activeTournament === null ? 'var(--accent-gold)' : 'var(--text-main)',
+                  border: activeTournament === null ? '1px solid var(--border-active)' : '1px solid var(--border-light)',
+                  fontWeight: activeTournament === null ? 700 : 500,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span>🌍 Prode Mundial 2026 (Global)</span>
+                {activeTournament === null && <span style={{ fontSize: '0.8rem' }}>• Activo</span>}
+              </button>
+            )}
 
             {/* Torneos Personalizados */}
             {tournaments.map((t) => (
