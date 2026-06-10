@@ -190,7 +190,7 @@ export const AppContainer: React.FC = () => {
 
       const targetTournamentId = memberView === 'leaderboard' ? rankingTournamentId : activeTournamentId;
 
-      if (targetTournamentId && targetTournamentId !== 'pending') {
+      if (targetTournamentId && targetTournamentId !== 'pending' && targetTournamentId !== 'no_tournament') {
         // Cargar predicciones del torneo personalizado seleccionado
         const tourneyPreds = await getTournamentPredictionsInDB(targetTournamentId, user.uid);
         setPredictions(tourneyPreds);
