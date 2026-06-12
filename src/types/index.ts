@@ -8,8 +8,8 @@ export interface UserProfile {
   role: UserRole;
   completedProde: boolean;
   points: number;
-  exactMatchesCount: number; // Aciertos marcadores exactos (3 pts)
-  outcomeMatchesCount: number; // Aciertos resultado/ganador (1 pt)
+  exactMatchesCount: number; // Aciertos marcadores exactos (6 pts)
+  outcomeMatchesCount: number; // Aciertos resultado/ganador (3 pts)
   isGhost?: boolean; // Participante de prueba creado por admin
   tournamentId?: string | null;
 }

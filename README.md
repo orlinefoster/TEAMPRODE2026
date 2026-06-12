@@ -42,8 +42,8 @@ Cuando un administrador ingresa el resultado final de un partido del mundial:
 1.  El partido cambia su estado a `status: "played"`.
 2.  Un **lote de escritura de Firestore (Write Batch)** actualiza todas las predicciones de los usuarios para ese partido.
 3.  Los puntajes se computan bajo las siguientes reglas:
-    *   **3 Puntos (Acierto Exacto):** Acertar la cantidad exacta de goles de ambos equipos.
-    *   **1 Punto (Acierto de Ganador/Empate):** Acertar qué equipo gana o si hay empate, pero sin pegar el marcador exacto.
+    *   **6 Puntos (Acierto Exacto):** Acertar la cantidad exacta de goles de ambos equipos.
+    *   **3 Puntos (Acierto de Ganador/Empate):** Acertar qué equipo gana o si hay empate, pero sin pegar el marcador exacto.
     *   **0 Puntos:** Pronóstico incorrecto.
 4.  Un segundo lote actualiza el perfil de cada participante afectado recalculando sus campos `points`, `exactMatchesCount` y `outcomeMatchesCount`.
 5.  Las tablas de posiciones y ránkings se actualizan de forma instantánea para todos los usuarios conectados.

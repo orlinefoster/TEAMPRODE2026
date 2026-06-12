@@ -191,7 +191,7 @@ export const TournamentManager: React.FC<TournamentManagerProps> = ({
                   onChange={(e) => setModality(e.target.value as 'exact' | 'simple')}
                   style={{ width: '100%', height: '42px', padding: '0 10px', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-main)', border: '1px solid var(--border-light)', borderRadius: '6px' }}
                 >
-                  <option value="exact">Marcador Exacto (Exacto = 3, Ganador = 1)</option>
+                  <option value="exact">Marcador Exacto (Exacto = 6, Ganador = 3)</option>
                   <option value="simple">Ganador o Empate Simple (Acierto = 1, Desacierto = 0)</option>
                 </select>
               </div>
@@ -246,7 +246,7 @@ export const TournamentManager: React.FC<TournamentManagerProps> = ({
                         disabled={activeTournament.modality === 'simple'}
                         style={{ width: '100%', height: '42px', padding: '0 10px', backgroundColor: 'var(--bg-overlay)', color: 'var(--text-main)', border: '1px solid var(--border-light)', borderRadius: '6px' }}
                       >
-                        <option value="exact">Marcador Exacto (Exacto = 3, Ganador = 1)</option>
+                        <option value="exact">Marcador Exacto (Exacto = 6, Ganador = 3)</option>
                         <option value="simple">Ganador o Empate Simple (Acierto = 1, Desacierto = 0)</option>
                       </select>
                       {activeTournament.modality === 'exact' && tempModality === 'simple' && (
@@ -293,7 +293,7 @@ export const TournamentManager: React.FC<TournamentManagerProps> = ({
                 
                 <div style={{ display: 'flex', gap: '15px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                   <span>
-                    Modalidad: <strong>{activeTournament.modality === 'simple' ? 'Ganador/Empate Simple (1 pt)' : 'Marcador Exacto (3 pts / 1 pt)'}</strong>
+                    Modalidad: <strong>{activeTournament.modality === 'simple' ? 'Ganador/Empate Simple (1 pt)' : 'Marcador Exacto (6 pts / 3 pts)'}</strong>
                   </span>
                   <span>•</span>
                   <span>
@@ -436,7 +436,7 @@ export const TournamentManager: React.FC<TournamentManagerProps> = ({
               Torneo Global Predeterminado
             </h2>
             <p style={{ color: 'var(--text-muted)', maxWidth: '500px', lineHeight: 1.5, margin: 0 }}>
-              Este es el torneo principal de la Copa Mundial 2026. Todos los participantes registrados compiten aquí de forma automática usando el sistema de puntos de Marcador Exacto (Exacto = 3 pts, Ganador/Empate = 1 pt).
+              Este es el torneo principal de la Copa Mundial 2026. Todos los participantes registrados compiten aquí de forma automática usando el sistema de puntos de Marcador Exacto (Exacto = 6 pts, Ganador/Empate = 3 pts).
             </p>
           </div>
         )}

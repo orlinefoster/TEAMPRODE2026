@@ -8,8 +8,8 @@ export interface ScoringResult {
 
 /**
  * Calcula los puntos ganados para una predicción específica contra un resultado real.
- * exact match: 3 pts
- * winner/draw outcome: 1 pt
+ * exact match: 6 pts
+ * winner/draw outcome: 3 pts
  * no hit: 0 pts
  */
 export const calculatePoints = (
@@ -18,17 +18,17 @@ export const calculatePoints = (
   homeActual: number,
   awayActual: number
 ): ScoringResult => {
-  // Acierto Exacto (3 Puntos)
+  // Acierto Exacto (6 Puntos)
   if (homePrediction === homeActual && awayPrediction === awayActual) {
-    return { points: 3, type: 'exact' };
+    return { points: 6, type: 'exact' };
   }
 
-  // Acierto de Ganador o Empate (1 Punto)
+  // Acierto de Ganador o Empate (3 Puntos)
   const predictionOutcome = Math.sign(homePrediction - awayPrediction);
   const actualOutcome = Math.sign(homeActual - awayActual);
 
   if (predictionOutcome === actualOutcome) {
-    return { points: 1, type: 'outcome' };
+    return { points: 3, type: 'outcome' };
   }
 
   // Sin acierto (0 Puntos)

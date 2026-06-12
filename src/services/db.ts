@@ -189,8 +189,8 @@ export const updateMatchResultInDB = async (
       userPreds.forEach((pred) => {
         if (pred.calculated && pred.pointsEarned !== undefined) {
           totalPoints += pred.pointsEarned;
-          if (pred.pointsEarned === 3) exactCount++;
-          if (pred.pointsEarned === 1) outcomeCount++;
+          if (pred.pointsEarned === 6) exactCount++;
+          if (pred.pointsEarned === 3) outcomeCount++;
         }
       });
 
@@ -291,8 +291,8 @@ export const updateMatchResultInDB = async (
         const pred = predDocSnap.data() as Prediction;
         if (pred.calculated && pred.pointsEarned !== undefined) {
           totalPoints += pred.pointsEarned;
-          if (pred.pointsEarned === 3) exactCount++;
-          if (pred.pointsEarned === 1) outcomeCount++;
+          if (pred.pointsEarned === 6) exactCount++;
+          if (pred.pointsEarned === 3) outcomeCount++;
         }
       });
 
@@ -356,8 +356,8 @@ export const deleteMatchResultInDB = async (matchId: string): Promise<void> => {
       userPreds.forEach((pred) => {
         if (pred.calculated && pred.pointsEarned !== undefined) {
           totalPoints += pred.pointsEarned;
-          if (pred.pointsEarned === 3) exactCount++;
-          if (pred.pointsEarned === 1) outcomeCount++;
+          if (pred.pointsEarned === 6) exactCount++;
+          if (pred.pointsEarned === 3) outcomeCount++;
         }
       });
 
@@ -418,8 +418,8 @@ export const deleteMatchResultInDB = async (matchId: string): Promise<void> => {
         const pred = predDocSnap.data() as Prediction;
         if (pred.calculated && pred.pointsEarned !== undefined) {
           totalPoints += pred.pointsEarned;
-          if (pred.pointsEarned === 3) exactCount++;
-          if (pred.pointsEarned === 1) outcomeCount++;
+          if (pred.pointsEarned === 6) exactCount++;
+          if (pred.pointsEarned === 3) outcomeCount++;
         }
       });
 
@@ -722,8 +722,8 @@ export const randomizeGhostPredictions = async (ghostId: string): Promise<void> 
     mockPredictions.forEach((p) => {
       if (p.calculated && p.pointsEarned !== undefined) {
         totalPoints += p.pointsEarned;
-        if (p.pointsEarned === 3) exactCount++;
-        if (p.pointsEarned === 1) outcomeCount++;
+        if (p.pointsEarned === 6) exactCount++;
+        if (p.pointsEarned === 3) outcomeCount++;
       }
     });
 
@@ -758,8 +758,8 @@ export const randomizeGhostPredictions = async (ghostId: string): Promise<void> 
         const pred = predDocSnap.data() as Prediction;
         if (pred.calculated && pred.pointsEarned !== undefined) {
           totalPoints += pred.pointsEarned;
-          if (pred.pointsEarned === 3) exactCount++;
-          if (pred.pointsEarned === 1) outcomeCount++;
+          if (pred.pointsEarned === 6) exactCount++;
+          if (pred.pointsEarned === 3) outcomeCount++;
         }
       });
 
@@ -1478,8 +1478,8 @@ export const recalculateCustomTournamentsForMatch = async (
             if (t.modality === 'simple') {
               if (pred.pointsEarned === 1) outcomeCount++;
             } else {
-              if (pred.pointsEarned === 3) exactCount++;
-              if (pred.pointsEarned === 1) outcomeCount++;
+              if (pred.pointsEarned === 6) exactCount++;
+              if (pred.pointsEarned === 3) outcomeCount++;
             }
           }
         });
@@ -1570,8 +1570,8 @@ export const recalculateCustomTournamentsForMatch = async (
               if (t.modality === 'simple') {
                 if (pred.pointsEarned === 1) outcomeCount++;
               } else {
-                if (pred.pointsEarned === 3) exactCount++;
-                if (pred.pointsEarned === 1) outcomeCount++;
+                if (pred.pointsEarned === 6) exactCount++;
+                if (pred.pointsEarned === 3) outcomeCount++;
               }
             }
           });
